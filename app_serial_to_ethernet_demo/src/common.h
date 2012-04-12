@@ -23,13 +23,16 @@ include files
 /*---------------------------------------------------------------------------
 constants
 ---------------------------------------------------------------------------*/
+//Separate thread for accessing flash routines
+/* Enable this macro if Web Server is not on Core 0 */
+//#define FLASH_THREAD
 /* Length of application buffer to hold UART channel data */
 #define UART_APP_TX_CHAN_COUNT		8 // Must be Same as UART_TX_CHAN_COUNT
-#define TX_CHANNEL_FIFO_LEN			256 //This is a common length between app server and data manager
-#define RX_CHANNEL_FIFO_LEN			256
+#define TX_CHANNEL_FIFO_LEN			32 //This is a common length between app server and data manager
+#define RX_CHANNEL_FIFO_LEN			32
 #ifndef NUM_HTTPD_CONNECTIONS
 /* Maximum number of concurrent connections */
-#define NUM_HTTPD_CONNECTIONS 10
+#define NUM_HTTPD_CONNECTIONS 2
 #endif //NUM_HTTPD_CONNECTIONS
 /* Configure web browser port number */
 #define HTTP_PORT					80
@@ -48,7 +51,7 @@ constants
 #define MARKER_END          '@'
 
 #define NUM_UI_PARAMS		(6 + 1) //1 for command type (added internally)
-#define UI_COMMAND_LENGTH	256 //TODO: Polarity parameter is not yet accounted
+#define UI_COMMAND_LENGTH	64 //TODO: Polarity parameter is not yet accounted
 
 /*---------------------------------------------------------------------------
 typedefs

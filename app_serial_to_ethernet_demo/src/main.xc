@@ -29,7 +29,7 @@
 #include "multi_uart_rxtx.h"
 #include <flash.h>
 #include "s2e_flash.h"
-
+#define MUART_CORE_NUM	1
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
@@ -53,19 +53,19 @@ on stdcore[0] : fl_SPIPorts flash_ports =
 };
 
 /* MUART TX port configuration */
-#define PORT_TX on stdcore[1]: XS1_PORT_8B
-#define PORT_RX on stdcore[1]: XS1_PORT_8A
+#define PORT_TX on stdcore[MUART_CORE_NUM]: XS1_PORT_8B
+#define PORT_RX on stdcore[MUART_CORE_NUM]: XS1_PORT_8A
 //#define PORT_TX_TEMP_3 on stdcore[1]: XS1_CLKBLK_1
 /* MUART RX port configuration */
 //#define PORT_RX_TEMP_1 on stdcore[1]: XS1_PORT_8B
 //#define PORT_RX_TEMP_2 on stdcore[1]: XS1_PORT_1B
 //#define PORT_RX_TEMP_3 on stdcore[1]: XS1_CLKBLK_2
 
-on stdcore[1]: clock uart_clock_tx = XS1_CLKBLK_1;
+on stdcore[MUART_CORE_NUM]: clock uart_clock_tx = XS1_CLKBLK_4;
 /* Define 1 bit external clock */
-on stdcore[1]: in port uart_ref_ext_clk = XS1_PORT_1F;
+on stdcore[MUART_CORE_NUM]: in port uart_ref_ext_clk = XS1_PORT_1F;
 
-on stdcore[1]: clock uart_clock_rx = XS1_CLKBLK_2;
+on stdcore[MUART_CORE_NUM]: clock uart_clock_rx = XS1_CLKBLK_3;
 
 #ifndef TWO_THREAD_ETH
 
@@ -229,7 +229,9 @@ int main(void)
     chan connect_status;
 #endif //TWO_THREAD_ETH
     chan xtcp[1];
+#ifdef FLASH_THREAD
     chan cPersData;
+#endif //FLASH_THREAD
 	streaming chan cWbSvr2AppMgr;
 	streaming chan cAppMgr2WbSvr;
 	streaming chan cTxUART;
@@ -280,7 +282,9 @@ int main(void)
 	            }
 #endif
 
+#ifdef FLASH_THREAD
 	            on stdcore[0]: flash_data_access(cPersData);
+#endif //FLASH_THREAD
 	            /*
 	            on stdcore[0]: dummy();
 	            on stdcore[0]: dummy();
@@ -291,11 +295,15 @@ int main(void)
 	            
 	            /* web server thread for handling and servicing http requests
 	            * and telnet data communication */
-	            on stdcore[1]: web_server(xtcp[0], cWbSvr2AppMgr, cAppMgr2WbSvr, cPersData);
+#ifndef FLASH_THREAD
+	            on stdcore[0]: web_server(xtcp[0], cWbSvr2AppMgr, cAppMgr2WbSvr);
+#else //FLASH_THREAD
+	            on stdcore[0]: web_server(xtcp[0], cWbSvr2AppMgr, cAppMgr2WbSvr, cPersData);
+#endif //FLASH_THREAD
 	            
 	            /* The multi-uart application manager thread to handle uart
 	            * data communication to web server clients */
-	            on stdcore[1]: app_manager_handle_uart_data(cWbSvr2AppMgr, cAppMgr2WbSvr, cTxUART, cRxUART);
+	            on stdcore[MUART_CORE_NUM]: app_manager_handle_uart_data(cWbSvr2AppMgr, cAppMgr2WbSvr, cTxUART, cRxUART);
 #if 0
 	            /* Multi-uart transmit thread */
 	            on stdcore[1]: run_multi_uart_tx( cTxUART, uart_tx_ports, uart_clock_tx );
@@ -304,7 +312,7 @@ int main(void)
 	            on stdcore[1]: run_multi_uart_rx( cRxUART, uart_rx_ports, uart_clock_rx );
 #else
 	            /* run the multi-uart RX & TX with a common external clock - (2 threads) */
-	            on stdcore[1]: run_multi_uart_rxtx( cTxUART,  uart_tx_ports, cRxUART, uart_rx_ports, uart_clock_rx, uart_ref_ext_clk, uart_clock_tx);
+	            on stdcore[MUART_CORE_NUM]: run_multi_uart_rxtx( cTxUART,  uart_tx_ports, cRxUART, uart_rx_ports, uart_clock_rx, uart_ref_ext_clk, uart_clock_tx);
 #endif
 #if 0
 	            on stdcore[1]: dummy();

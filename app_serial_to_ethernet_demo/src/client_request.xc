@@ -20,7 +20,7 @@ include files
 #include "client_request.h"
 #include "s2e_flash.h"
 #include "common.h"
-#include <print.h>
+#include "debug.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------
@@ -62,7 +62,11 @@ static void clear_char_array(char c[], int length);
 
 static void replace_with_zero(char rwz_c[], int rwz_start, int rwz_end);
 
+#ifndef FLASH_THREAD
+static int get_flash_config_address();
+#else //FLASH_THREAD
 static int get_flash_config_address(chanend cPersData);
+#endif //FLASH_THREAD
 
 static void create_get_command(char cc_data[], int cc_channel);
 
@@ -79,11 +83,18 @@ implementation
 *  \param yyy    description of yyy
 *
 **/
+#ifndef FLASH_THREAD
+int parse_client_request(streaming chanend cWbSvr2AppMgr,
+                         char data[],
+                         char response[],
+                         int data_length)
+#else //FLASH_THREAD
 int parse_client_request(streaming chanend cWbSvr2AppMgr,
                          chanend cPersData,
                          char data[],
                          char response[],
                          int data_length)
+#endif //FLASH_THREAD
 {
     char rtnval;
     char done = 0;
@@ -102,7 +113,7 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
 
     // clear array
     clear_char_array(flash_data, FLASH_SIZE_PAGE);
-    clear_char_array(response, FLASH_SIZE_PAGE);
+    clear_char_array(response, UI_COMMAND_LENGTH);
 
     switch(command)
     {
@@ -130,7 +141,11 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
         case CMD_CONFIG_SAVE:
         {
             // get flash config address
+#ifndef FLASH_THREAD
+            config_address = get_flash_config_address();
+#else //FLASH_THREAD
             config_address = get_flash_config_address(cPersData);
+#endif //FLASH_THREAD
 
             // get settings for each config from app_manager
             // TODO: flash_data[0] must contain validity flag for settings in flash
@@ -157,10 +172,14 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
             }
 
             // send this data to core 0 to write to flash
+#ifndef FLASH_THREAD
+            flash_write_config(config_address, flash_data);
+#else //FLASH_THREAD
             flash_access(FLASH_CONFIG_WRITE,
                          flash_data,
                          config_address,
                          cPersData);
+#endif //FLASH_THREAD
 
             break;
         } // case CMD_CONFIG_SAVE:
@@ -168,10 +187,16 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
         case CMD_CONFIG_RESTORE:
         {
             // get flash config address
+#ifndef FLASH_THREAD
+            config_address = get_flash_config_address();
+            // get the data from flash
+            flash_read_config(config_address, flash_data);
+#else //FLASH_THREAD
             config_address = get_flash_config_address(cPersData);
-
             // get the data from flash
             flash_access(FLASH_CONFIG_READ, flash_data, config_address, cPersData);
+#endif //FLASH_THREAD
+
             // check for configuration present in flash
             if(flash_data[0] != FLASH_VALID_CONFIG_PRESENT)
             {}
@@ -181,8 +206,8 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
                 for(i = 0; i < UART_APP_TX_CHAN_COUNT; i++)
                 {
                     // find markers stored in flash
-                    temp_start = get_marker_index(flash_data, UI_COMMAND_LENGTH, MARKER_START);
-                    temp_end = get_marker_index(flash_data, UI_COMMAND_LENGTH, MARKER_END);
+                    temp_start = get_marker_index(flash_data, FLASH_SIZE_PAGE, MARKER_START);
+                    temp_end = get_marker_index(flash_data, FLASH_SIZE_PAGE, MARKER_END);
                     // replace command and channel
                     create_set_command(flash_data, i, temp_start);
                     // send data to app_manager
@@ -322,7 +347,11 @@ static void replace_with_zero(char rwz_c[], int rwz_start, int rwz_end)
  *  \param int     length of character array
  *
  **/
+#ifndef FLASH_THREAD
+static int get_flash_config_address()
+#else //FLASH_THREAD
 static int get_flash_config_address(chanend cPersData)
+#endif //FLASH_THREAD
 {
     int flash_index_page_config, flash_length_config;
     int flash_size_config;
@@ -334,9 +363,15 @@ static int get_flash_config_address(chanend cPersData)
 
     // get the config address. config data will be stored in a new sector above the fs file system
     // this way the sector can be erased an re-written on 'save' request
+#ifndef FLASH_THREAD
+    config_address = flash_get_config_address(flash_index_page_config,
+                                              flash_length_config);
+#else //FLASH_THREAD
     config_address = get_config_address(flash_index_page_config,
                                         flash_length_config,
                                         cPersData);
+#endif //FLASH_THREAD
+
     return config_address;
 }
 

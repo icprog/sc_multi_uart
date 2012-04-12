@@ -19,19 +19,13 @@ connection state management and functionality to interface http client
 include files
 ---------------------------------------------------------------------------*/
 #include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include "app_manager.h"
 #include "debug.h"
 #include "common.h"
 
-
 /*---------------------------------------------------------------------------
 constants
 ---------------------------------------------------------------------------*/
-#define STR_N_CPY(dest, src, len) do { dest[len-1] = src[len-1]; \
-                                        len--; \
-                                      } while (0!=len)
 #define	MAX_BIT_RATE					115200 //100000		//bits per sec
 #define TIMER_FREQUENCY					100000000	//100 Mhz
 /* Default length of a uart character in bits */
@@ -201,105 +195,23 @@ static void send_string_over_channel(
 *  \return		0 		on success
 *
 **/
-//static int validate_uart_params(int ui_command[], char ui_cmd_response[])
 static int validate_uart_params(
 		int ui_command[],
 		streaming chanend cWbSvr2AppMgr)
 {
-	int retVal = 1; //Default Success
-	int i = 0;
-	int j = 0;
-
-	/*  ui_command[0] == Command type    -  ignore it for validation
-	 *  ui_command[1] == UART Identifier -  < UART_RX_CHAN_COUNT
-	 *  ui_command[2] == parity
-	 *  ui_command[3] == stop_bits
-	 *  ui_command[4] == baud
-	 *  ui_command[5] == char_len
-	 *  ui_command[6] == telnet_port
-	 */
-	for (i=1; ((i<NUM_UI_PARAMS)&& (retVal != 0)); i++)
+	if ( (ui_command[1] >= UART_RX_CHAN_COUNT) ||
+		 ( ((ui_command[0] + 48) == CMD_CONFIG_SET) &&
+		   ( ((ui_command[2] < 0) || (ui_command[2] > 4)) ||
+		     ((ui_command[3] < 0) || (ui_command[3] > 1)) ||
+		     ((ui_command[4] < 150) || (ui_command[4] > UART_TX_MAX_BAUD_RATE)) ||
+		     ((ui_command[5] < 5) || (ui_command[5] > 9)) ||
+		     ((ui_command[6] < 10) || (ui_command[6] > 65000)) ) ) )
 	{
-	    switch(i)
-	    {
-	        case 1:
-	        {
-				if (ui_command[1] >= UART_RX_CHAN_COUNT)
-				{
-					send_string_over_channel("Invalid UART Id", 16, cWbSvr2AppMgr);
-					retVal = 0;
-				}
-				/* Break validation if command is !SET*/
-				if ((ui_command[0] + 48) != CMD_CONFIG_SET)
-				{
-					i = NUM_UI_PARAMS; //To break looping
-				}
-	            break;
-	        }
-	        case 2:
-	        {
-				if ((ui_command[2] < 0) || (ui_command[2] > 4))
-				{
-					send_string_over_channel("Invalid Parity Config value", 28, cWbSvr2AppMgr);
-					retVal = 0;
-				}
-	            break;
-	        }
-	        case 3:
-	        {
-				if ((ui_command[3] < 0) || (ui_command[3] > 1))
-				{
-					send_string_over_channel("Invalid Stop Bit value", 28, cWbSvr2AppMgr);
-					retVal = 0;
-				}
-	            break;
-	        }
-	        case 4:
-	        {
-				if ((ui_command[4] < 150) || (ui_command[4] > UART_TX_MAX_BAUD_RATE))
-				{
-					send_string_over_channel("Invalid Baud Rate value", 24, cWbSvr2AppMgr);
-					retVal = 0;
-				}
-	            break;
-	        }
-	        case 5:
-	        {
-				if ((ui_command[5] < 5) || (ui_command[5] > 9))
-				{
-					send_string_over_channel("Invalid UART character length", 30, cWbSvr2AppMgr);
-					retVal = 0;
-				}
-	            break;
-	        }
-	        case 6:
-	        {
-				if ((ui_command[6] < 10) || (ui_command[6] > 65000))
-				{
-					send_string_over_channel("Invalid Telnet Port", 20, cWbSvr2AppMgr);
-					retVal = 0;
-				}
-				else if (uart_channel_config[ui_command[1]].telnet_port != ui_command[6])
-				{
-					/* For a new telnet port, check if it is already used */
-					for(j=0; j<UART_TX_CHAN_COUNT; j++)
-				    {
-						if (uart_channel_config[j].telnet_port == ui_command[6])
-						{
-							send_string_over_channel("Telnet port is already in use", 30, cWbSvr2AppMgr);
-							retVal = 0;
-							break;
-						}
-				    }
-				}
-				break;
-	        }
-	        default:
-	        	break;
-	    }
+		send_string_over_channel("Invalid Command", 16, cWbSvr2AppMgr);
+		return 0;
 	}
 
-	return retVal;
+	return 1;
 }
 
 /** =========================================================================
@@ -359,8 +271,10 @@ static void apply_default_uart_cfg_and_wait_for_muart_tx_rx_threads(
 		chnl_config_status = configure_uart_channel(channel_id);
 		if (0 != chnl_config_status)
 		{
+#ifdef DEBUG_LEVEL_1
 			printstr("Uart configuration failed for channel: ");
 			printintln(channel_id);
+#endif //DEBUG_LEVEL_1
 			chnl_config_status = 0;
 		}
 		else
@@ -702,19 +616,11 @@ void fill_uart_channel_data_from_queue()
 *  \return			None
 *
 **/
-#if 0 //CleanUp
-static int re_apply_uart_channel_config(
-		s_uart_channel_config	&sUartChannelConfig,
-		streaming chanend cTxUART,
-		streaming chanend cRxUART)
-#else
 static int re_apply_uart_channel_config(
 		int channel_id,
 		streaming chanend cTxUART,
 		streaming chanend cRxUART)
-#endif
 {
-	int ret_val = 0;
     int chnl_config_status = 0;
     timer t;
 
@@ -727,11 +633,13 @@ static int re_apply_uart_channel_config(
     uart_tx_reconf_enable( cTxUART );
     uart_rx_reconf_enable( cRxUART );
 
+#ifdef DEBUG_LEVEL_1
     if (0 != chnl_config_status)
     {
     	printint(channel_id);
     	printstrln(": Channel reconfig failed");
     }
+#endif //DEBUG_LEVEL_1
 	//TODO: Send response back on the channel
 }
 
@@ -751,25 +659,20 @@ static int parse_uart_command_data(
 		streaming chanend cRxUART)
 {
 	char ui_cmd_unparsed[UI_COMMAND_LENGTH];
-	char ui_cmd_response[UI_COMMAND_LENGTH]; //TODO; Chk if this can be optimized
 	int ui_command[NUM_UI_PARAMS];
 	int cmd_length = 0;
     char cmd_type;
-
-	int i, j;
+	int i = 0, j =0;
 	int iTemp = 0;
-    char dv[20]; //
     int index_start = 0;
     int index_end = 0;
     int index_cfg = -1;
     int index_uart = 0;
     char ui_param[20];
+    int done = 0;
 
     /* Get UART command data */
     {
-        int done = 0;
-        int i = 0;
-
         do
         {
             cWbSvr2AppMgr :> ui_cmd_unparsed[i];
@@ -781,7 +684,7 @@ static int parse_uart_command_data(
             {
                 i++;
             }
-        } while(done == 0);
+        } while((done == 0) && (i < UI_COMMAND_LENGTH));
 
         cmd_length = i;
     }
@@ -805,15 +708,15 @@ static int parse_uart_command_data(
             	/* Clear the array */
                 for (iTemp = 0; iTemp < 20; iTemp++)
                 {
-                	dv[iTemp] = '\0';
+                	ui_param[iTemp] = '\0';
                 }
 
                 for (j = 0; j < (i - index_start); j++)
                 {
-                    dv[j] = ui_cmd_unparsed[j + index_start];
+                	ui_param[j] = ui_cmd_unparsed[j + index_start];
                 }
 
-                ui_command[index_cfg] = atoi(dv);
+                ui_command[index_cfg] = atoi(ui_param);
                 index_end = 0;
                 index_start = 0;
             } //else [if (index_end == 0)]
@@ -821,12 +724,10 @@ static int parse_uart_command_data(
     } //for (i = 0; i < cmd_length; i++)
 
     // Now process the Command request
-    //if (validate_uart_params(ui_command, ui_cmd_response) //TODO
     if (validate_uart_params(ui_command, cWbSvr2AppMgr))
     {
         cmd_type = ui_command[0] + 48; // +48 for char
         index_uart = ui_command[1]; //UART channel identifier
-
         if (CMD_CONFIG_GET == cmd_type)
         {
             // Get settings and store it in config_structure array
@@ -883,9 +784,6 @@ static int parse_uart_command_data(
         }
         cWbSvr2AppMgr <: MARKER_END;
     }
-
-    //TODO: Incase of error in applying UART parameters, error msg to be sent
-
 }
 
 /** 
@@ -905,15 +803,13 @@ void app_manager_handle_uart_data(
 		streaming chanend cTxUART,
 		streaming chanend cRxUART)
 {
-	timer txTimer, rxTimer;
-	unsigned txTimeStamp, rxTimeStamp;
+	timer txTimer;
+	timer rxTimer;
+	unsigned txTimeStamp;
+	unsigned rxTimeStamp;
 	char rx_channel_id;
-	unsigned int local_port = 0;
-	int conn_id  = 0;
 	int WbSvr2AppMgr_chnl_data = 9999;
-	char flash_config_valid;
-	int i, j, intdata;
-	char flash_data;
+	int i;
 
 	//TODO: Flash cold start should happen here
 	/* Applying default in-program values, in case Cold start fails */

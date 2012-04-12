@@ -34,6 +34,7 @@ constants
 //#define PROCESS_USER_DATA_TMR_EVENT_INTRVL		(TIMER_FREQUENCY /	\
 //										(MAX_BIT_RATE * UART_APP_TX_CHAN_COUNT))
 #define PROCESS_USER_DATA_TMR_EVENT_INTRVL	4000 //500
+#define TOTAL_CONNECTIONS		(NUM_HTTPD_CONNECTIONS+NUM_TELNETD_CONNECTIONS)
 
 /*---------------------------------------------------------------------------
 ports and clocks
@@ -78,7 +79,8 @@ typedef struct STRUCT_MAP_APP_MGR_TO_UART
 /*---------------------------------------------------------------------------
 global variables
 ---------------------------------------------------------------------------*/
-s_user_data_fifo   user_client_data_buffer[NUM_HTTPD_CONNECTIONS]; //Number of client connections that can be suppported
+//TODO: Due to L1 code costraints, user_client_data_buffer can be limited to only telnet clients
+s_user_data_fifo   user_client_data_buffer[NUM_TELNETD_CONNECTIONS]; //Number of client connections that can be suppported
 s_map_app_mgr_to_uart user_port_to_uart_id_map[UART_APP_TX_CHAN_COUNT];
 /*---------------------------------------------------------------------------
 static variables
@@ -138,13 +140,13 @@ static int fetch_conn_id_for_uart_id(int uart_id)
 
 	if (i != UART_APP_TX_CHAN_COUNT)
 	{
-	    for (j = 0; j < NUM_HTTPD_CONNECTIONS; j++)
+	    for (j = 0; j < NUM_TELNETD_CONNECTIONS; j++)
 	    {
 			if (user_port_to_uart_id_map[i].local_port == user_client_data_buffer[j].conn_local_port)
 				break;
 	    }
 
-	    if (j != NUM_HTTPD_CONNECTIONS)
+	    if (j != NUM_TELNETD_CONNECTIONS)
 	    {
 	    	conn_id = user_client_data_buffer[j].conn_id;
 	    }
@@ -171,13 +173,13 @@ void update_user_conn_details(xtcp_connection_t &conn)
     int i;
 
     // Try and find an empty connection slot
-    for (i = 0; i < NUM_HTTPD_CONNECTIONS; i++)
+    for (i = 0; i < NUM_TELNETD_CONNECTIONS; i++)
     {
         if (!user_client_data_buffer[i].conn_local_port)
             break;
     }
 
-    if (i == NUM_HTTPD_CONNECTIONS)
+    if (i == NUM_TELNETD_CONNECTIONS)
     {
         // If no free connection slots were found
     	//Flag as error
@@ -209,13 +211,13 @@ void free_user_conn_details(xtcp_connection_t &conn)
     int i;
 
     // Try and find an empty connection slot
-    for (i = 0; i < NUM_HTTPD_CONNECTIONS; i++)
+    for (i = 0; i < NUM_TELNETD_CONNECTIONS; i++)
     {
         if (user_client_data_buffer[i].conn_local_port == conn.local_port)
             break;
     }
 
-    if (i == NUM_HTTPD_CONNECTIONS)
+    if (i == NUM_TELNETD_CONNECTIONS)
     {
         // If no free connection slots were found
     	//Flag as error
@@ -254,13 +256,13 @@ void fetch_user_data(
 	int write_index = 0;
 
 	/* Identify buffer to be filled */
-    for (i = 0; i < NUM_HTTPD_CONNECTIONS; i++)
+    for (i = 0; i < NUM_TELNETD_CONNECTIONS; i++)
     {
         if (user_client_data_buffer[i].conn_local_port == conn.local_port)
             break;
     }
 
-    if (i == NUM_HTTPD_CONNECTIONS)
+    if (i == NUM_TELNETD_CONNECTIONS)
     {
         // If no free connection slots were found
     	//Flag as error
@@ -406,17 +408,23 @@ static void send_data_to_client(
 *  \return			None
 *
 **/
+#ifndef FLASH_THREAD
+static void process_user_data(
+		streaming chanend cWbSvr2AppMgr,
+		chanend tcp_svr)
+#else //FLASH_THREAD
 static void process_user_data(
 		streaming chanend cWbSvr2AppMgr,
 		chanend cPersData,
 		chanend tcp_svr)
+#endif //FLASH_THREAD
 {
 	int idxBuffer = 0;
 	int uart_loop = 0;
 	int read_index = 0;
 
 	/* Identify buffer to be filled */
-    for (idxBuffer = 0; idxBuffer < NUM_HTTPD_CONNECTIONS; idxBuffer++)
+    for (idxBuffer = 0; idxBuffer < NUM_TELNETD_CONNECTIONS; idxBuffer++)
     {
 		if (TRUE == user_client_data_buffer[idxBuffer].is_currently_serviced)
 			break;
@@ -424,12 +432,12 @@ static void process_user_data(
 
 	/* 'i' now contains buffer # that is just serviced
 	 * reset it and increment to point to next buffer */
-    if (idxBuffer != NUM_HTTPD_CONNECTIONS)
+    if (idxBuffer != NUM_TELNETD_CONNECTIONS)
     {
         user_client_data_buffer[idxBuffer].is_currently_serviced = FALSE;
         idxBuffer++;
     	//channel_id &= (UART_APP_TX_CHAN_COUNT-1);
-        if (idxBuffer >= NUM_HTTPD_CONNECTIONS)
+        if (idxBuffer >= NUM_TELNETD_CONNECTIONS)
         {
         	idxBuffer = 0;
         }
@@ -487,11 +495,18 @@ static void process_user_data(
             		cmd_complete = 0;
 
             		/* Parse commands and send to UART Manager via cWbSvr2AppMgr */
-                    parse_client_request(cWbSvr2AppMgr,
+#ifndef FLASH_THREAD
+            		parse_client_request(cWbSvr2AppMgr,
+                                         data,
+                                         response,
+                                         cmd_data_idx);
+#else //FLASH_THREAD
+            		parse_client_request(cWbSvr2AppMgr,
                                          cPersData,
                                          data,
                                          response,
                                          cmd_data_idx);
+#endif //FLASH_THREAD
                     /* Send response back to telnet client */
                     connection_state_index =
                     		fetch_connection_state_index(
@@ -532,7 +547,7 @@ static void process_user_data(
             	user_client_data_buffer[idxBuffer].read_index = read_index;
         	} //If telnet data for UART X
         } //If there is any client data
-    } //if (i != NUM_HTTPD_CONNECTIONS)
+    } //if (i != NUM_TELNETD_CONNECTIONSs)
 
 }
 
@@ -552,11 +567,18 @@ static void process_user_data(
 *  \return	None
 *
 **/
+#ifndef FLASH_THREAD
+void web_server_handle_event(
+		chanend tcp_svr,
+		xtcp_connection_t &conn,
+		streaming chanend cWbSvr2AppMgr)
+#else //FLASH_THREAD
 void web_server_handle_event(
 		chanend tcp_svr,
 		xtcp_connection_t &conn,
 		streaming chanend cWbSvr2AppMgr,
 		chanend cPersData)
+#endif //FLASH_THREAD
 {
 	AppPorts app_port_type = TYPE_UNSUPP_PORT;
 	int WbSvr2AppMgr_chnl_data = 9999;
@@ -604,15 +626,19 @@ void web_server_handle_event(
     		  /* Initialize and manage telnet connection state
     		   * and set tx buffers */
     		  telnetd_init_state(tcp_svr, conn);
+        	  /* Note connection details so that data is manageable
+        	   * at server level */
+        	  update_user_conn_details(conn);
     	  }
-    	  /* Note connection details so that data is manageable
-    	   * at server level */
-    	  update_user_conn_details(conn);
         break;
       case XTCP_RECV_DATA:
     	  if (app_port_type==TYPE_HTTP_PORT)
     	  {
+#ifndef FLASH_THREAD
+    		  httpd_recv(tcp_svr, conn, cWbSvr2AppMgr);
+#else //FLASH_THREAD
     		  httpd_recv(tcp_svr, conn, cPersData, cWbSvr2AppMgr);
+#endif //FLASH_THREAD
     	  }
     	  else if (app_port_type==TYPE_TELNET_PORT)
     	  {
@@ -623,7 +649,11 @@ void web_server_handle_event(
       case XTCP_REQUEST_DATA:
       case XTCP_RESEND_DATA:
     	  if (app_port_type==TYPE_HTTP_PORT)
+#ifndef FLASH_THREAD
+    		  httpd_send(tcp_svr, conn);
+#else //FLASH_THREAD
     		  httpd_send(tcp_svr, conn, cPersData);
+#endif //FLASH_THREAD
     	  else if (app_port_type==TYPE_TELNET_PORT)
     		  telnet_buffered_send_handler(tcp_svr, conn);
           break;
@@ -633,9 +663,10 @@ void web_server_handle_event(
     	  if (app_port_type==TYPE_HTTP_PORT)
     		  httpd_free_state(conn);
     	  else if (app_port_type==TYPE_TELNET_PORT)
+    	  {
     		  telnetd_free_state(conn);
-
-    	  free_user_conn_details(conn);
+    		  free_user_conn_details(conn);
+    	  }
     	  break;
       default:
         // Ignore anything else
@@ -661,11 +692,18 @@ void web_server_handle_event(
 *  \return	None
 *
 **/
+#ifndef FLASH_THREAD
+void web_server(
+		chanend tcp_svr,
+		streaming chanend cWbSvr2AppMgr,
+		streaming chanend cAppMgr2WbSvr)
+#else //FLASH_THREAD
 void web_server(
 		chanend tcp_svr,
 		streaming chanend cWbSvr2AppMgr,
 		streaming chanend cAppMgr2WbSvr,
 		chanend cPersData)
+#endif //FLASH_THREAD
 {
   xtcp_connection_t conn;
   timer processUserDataTimer;
@@ -704,11 +742,18 @@ void web_server(
   flash_data[3] = MARKER_END;
 
   // Browser is requesting data
+#ifndef FLASH_THREAD
+  parse_client_request(cWbSvr2AppMgr,
+                       flash_data,
+                       r_data,
+                       FLASH_SIZE_PAGE);
+#else //FLASH_THREAD
   parse_client_request(cWbSvr2AppMgr,
                        cPersData,
                        flash_data,
                        r_data,
                        FLASH_SIZE_PAGE);
+#endif //FLASH_THREAD
 
   // Loop forever processing TCP events
   while(1)
@@ -739,6 +784,16 @@ void web_server(
         	}
         }
         break;
+#ifndef FLASH_THREAD
+        case xtcp_event(tcp_svr, conn):
+          web_server_handle_event(tcp_svr, conn, cWbSvr2AppMgr);
+          break;
+        case processUserDataTimer when timerafter (processUserDataTS) :> char _ :
+          //Send user data to Uart App
+          process_user_data(cWbSvr2AppMgr, tcp_svr);
+          processUserDataTS += PROCESS_USER_DATA_TMR_EVENT_INTRVL;
+          break;
+#else //FLASH_THREAD
         case xtcp_event(tcp_svr, conn):
           web_server_handle_event(tcp_svr, conn, cWbSvr2AppMgr, cPersData);
           break;
@@ -747,6 +802,7 @@ void web_server(
           process_user_data(cWbSvr2AppMgr, cPersData, tcp_svr);
           processUserDataTS += PROCESS_USER_DATA_TMR_EVENT_INTRVL;
           break;
+#endif //FLASH_THREAD
         default:
           break;
         }

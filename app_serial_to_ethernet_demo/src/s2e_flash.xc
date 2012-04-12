@@ -21,7 +21,6 @@
 #include <flashlib.h>
 #include <flash.h>
 #include <string.h>
-#include <print.h>
 #include "s2e_flash.h"
 #include "debug.h"
 
@@ -43,11 +42,9 @@ on stdcore[0] : extern fl_SPIPorts flash_ports;
  ---------------------------------------------------------------------------*/
 // Array of allowed flash devices from "SpecMacros.h"
 fl_DeviceSpec myFlashDevices[] =
-{ FL_DEVICE_ATMEL_AT25FS010,
-  FL_DEVICE_ATMEL_AT25DF041A,
-  FL_DEVICE_WINBOND_W25X10,
-  FL_DEVICE_WINBOND_W25X20,
-  FL_DEVICE_WINBOND_W25X40 };
+{
+     FL_DEVICE_NUMONYX_M25P16
+};
 
 
 fsdata_t fsdata[] =
@@ -143,17 +140,18 @@ int write_to_flash(int address, char data[])
 int connect_flash()
 {
     /* Connect to the FLASH */
-    if (0 != fl_connectToDevice(flash_ports, myFlashDevices, 5)) { return -1; }
+    if (0 != fl_connectToDevice(flash_ports, myFlashDevices, 1)) { return -1; }
     /*Get the FLASH type*/
     switch (fl_getFlashType())
     {
         case 0: break;
-        case ATMEL_AT25FS010: break;
-        case ATMEL_AT25DF041A: break;
-        case WINBOND_W25X10: break;
-        case WINBOND_W25X20: break;
-        case WINBOND_W25X40: break;
-        default: printstrln("FLASH fitted : Unexpected!"); return -1; break;
+        case NUMONYX_M25P16: break;
+        default:
+#ifdef DEBUG_LEVEL_1
+        	printstrln("FLASH fitted : Unexpected!");
+#endif //DEBUG_LEVEL_1
+        	return -1;
+        break;
     }
     return 0; // all ok
 }
@@ -228,6 +226,56 @@ int get_flash_data_page_address(int data_page)
     return address;
 }
 
+#ifndef FLASH_THREAD
+/** =========================================================================
+*  flash_get_config_address
+*  \param last_rom_page: page number of the last fs file
+*  \param last_rom_length: length of the last fs file
+*
+**/
+int flash_get_config_address(int last_rom_page, int last_rom_length)
+{
+    int address;
+    address = get_flash_config_address(last_rom_page, last_rom_length);
+    return address;
+}
+
+/** =========================================================================
+*  flash_read_rom
+*  \param page: page number to read
+*  \param data[]: flash data will be stored here
+*
+**/
+void flash_read_rom(int page, char data[])
+{
+    int address;
+    address = get_flash_data_page_address(page);
+    read_from_flash(address, data);
+}
+
+/** =========================================================================
+*  flash_write_config
+*  \param address: address to write to
+*  \param data[]: data to be stored in flash
+*
+**/
+void flash_write_config(int address, char data[])
+{
+    write_to_flash(address, data);
+}
+
+/** =========================================================================
+*  flash_read_config
+*  \param address: address to read from
+*  \param data[]: flash data to be stored here
+*
+**/
+void flash_read_config(int address, char data[])
+{
+    read_from_flash(address, data);
+}
+
+#else //FLASH_THREAD
 /** =========================================================================
  *  flash_data_access
  *
@@ -368,5 +416,6 @@ int get_config_address(int last_rom_page, int last_rom_length, chanend cPersData
     cPersData :> address;
     return address;
 }
+#endif //FLASH_THREAD
 
 /*=========================================================================*/
