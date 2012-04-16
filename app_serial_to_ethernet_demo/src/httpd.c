@@ -19,6 +19,7 @@
  include files
  ---------------------------------------------------------------------------*/
 #include <string.h>
+//#include <print.h>
 #include "httpd.h"
 #include "common.h"
 #include "debug.h"
@@ -32,6 +33,8 @@
 #define HTTP_REQ_ERR            0
 #define HTTP_REQ_GET_WEBPAGE    1
 #define HTTP_REQ_GET_DATA       2
+
+//#define HTTP_DEBUG 1
 
 /*---------------------------------------------------------------------------
  ports and clocks
@@ -81,6 +84,7 @@ static void setup_error_webpage(httpd_state_t *hs);
  *  \return	None
  *
  **/
+#pragma unsafe arrays
 void httpd_init(chanend tcp_svr)
 {
     int i;
@@ -117,6 +121,7 @@ void httpd_init(chanend tcp_svr)
  *  \return	None
  *
  **/
+#pragma unsafe arrays
 #ifndef FLASH_THREAD
 #ifdef __XC__
 void parse_http_request(httpd_state_t *hs,
@@ -161,6 +166,9 @@ void parse_http_request(httpd_state_t *hs,
     {
         if (data[5] == '~')
         {
+#ifdef HTTP_DEBUG
+        printstrln("Got data request");
+#endif
             // Browser is requesting data
 #ifndef FLASH_THREAD
             parse_client_request(cWbSvr2AppMgr,
@@ -181,6 +189,9 @@ void parse_http_request(httpd_state_t *hs,
         } // if (data[5] == HTTP_REQ_GET_DATA)
         else
         {
+#ifdef HTTP_DEBUG
+        printstrln("Got webpage request");
+#endif
             hs->http_request_type = HTTP_REQ_GET_WEBPAGE;
             for (i = 4; i < 36; i++)
             {
@@ -219,6 +230,9 @@ void parse_http_request(httpd_state_t *hs,
                     break;
                 } // if(data[i] = ' ')
             } // for (i = 4; i < 36; i++)
+#ifdef HTTP_DEBUG
+        printstr("Page number: "); printintln(hs->dptr);
+#endif
         } // else
     } // if GET
     else
@@ -240,6 +254,7 @@ void parse_http_request(httpd_state_t *hs,
  *  \return	None
  *
  **/
+#pragma unsafe arrays
 #ifndef FLASH_THREAD
 #ifdef __XC__
 void httpd_recv(chanend tcp_svr, xtcp_connection_t *conn, streaming chanend cWbSvr2AppMgr)
@@ -297,6 +312,7 @@ void httpd_recv(chanend tcp_svr, xtcp_connection_t *conn, chanend cPersData, cha
  *  \return	None
  *
  **/
+#pragma unsafe arrays
 #ifndef FLASH_THREAD
 void httpd_send(chanend tcp_svr, xtcp_connection_t *conn)
 #else //FLASH_THREAD
@@ -331,7 +347,7 @@ void httpd_send(chanend tcp_svr, xtcp_connection_t *conn, chanend cPersData)
                              cPersData);
 #endif //FLASH_THREAD
 
-                if(hs->wpage_data[0] != 255)
+                if(strncmp(hs->wpage_data, "HTTP/1.0 200 OK", 15) == 0)
                 {}
                 else
                 {
@@ -408,6 +424,7 @@ void httpd_send(chanend tcp_svr, xtcp_connection_t *conn, chanend cPersData)
  *  \return	None
  *
  **/
+#pragma unsafe arrays
 void httpd_init_state(chanend tcp_svr, xtcp_connection_t *conn)
 {
     int i;
@@ -450,6 +467,7 @@ void httpd_init_state(chanend tcp_svr, xtcp_connection_t *conn)
  *  \return	None
  *
  **/
+#pragma unsafe arrays
 void httpd_free_state(xtcp_connection_t *conn)
 {
     int i;
@@ -473,6 +491,7 @@ void httpd_free_state(xtcp_connection_t *conn)
  *
  *
  **/
+#pragma unsafe arrays
 static void setup_error_webpage(httpd_state_t *hs)
 {
     memset(&(hs->wpage_data[0]), NULL, sizeof(hs->wpage_data));

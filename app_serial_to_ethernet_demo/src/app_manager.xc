@@ -72,6 +72,7 @@ implementation
 *  \return		None
 *
 **/
+#pragma unsafe arrays
 static void uart_channel_init(void)
 {
   int i;
@@ -124,6 +125,7 @@ static void uart_channel_init(void)
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 static void init_uart_channel_state(void)
 {
   int i;
@@ -171,6 +173,7 @@ static void init_uart_channel_state(void)
     }	//for (i=0;i<UART_TX_CHAN_COUNT;i++)
 }
 
+#pragma unsafe arrays
 static void send_string_over_channel(
 		char response[],
 		int length,
@@ -195,6 +198,7 @@ static void send_string_over_channel(
 *  \return		0 		on success
 *
 **/
+#pragma unsafe arrays
 static int validate_uart_params(
 		int ui_command[],
 		streaming chanend cWbSvr2AppMgr)
@@ -223,6 +227,7 @@ static int validate_uart_params(
 *  \return		0 		on success
 *
 **/
+#pragma unsafe arrays
 static int configure_uart_channel(unsigned int channel_id)
 {
   int chnl_config_status = ERR_CHANNEL_CONFIG;
@@ -258,6 +263,7 @@ static int configure_uart_channel(unsigned int channel_id)
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 static void apply_default_uart_cfg_and_wait_for_muart_tx_rx_threads(
 		streaming chanend cTxUART,
 		streaming chanend cRxUART)
@@ -310,6 +316,7 @@ static void apply_default_uart_cfg_and_wait_for_muart_tx_rx_threads(
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 static void fill_uart_channel_data(
 		streaming chanend cWbSvr2AppMgr)
 {
@@ -379,6 +386,7 @@ static void fill_uart_channel_data(
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 void receive_uart_channel_data(
 		streaming chanend cUART,
 		unsigned channel_id)
@@ -470,6 +478,7 @@ void receive_uart_channel_data(
 *  					0	otherwise
 *
 **/
+#pragma unsafe arrays
 static int get_uart_channel_data(
 		streaming chanend cAppMgr2WbSvr)
 {
@@ -551,6 +560,7 @@ static int get_uart_channel_data(
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 void fill_uart_channel_data_from_queue()
 {
 	int channel_id;
@@ -616,6 +626,7 @@ void fill_uart_channel_data_from_queue()
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 static int re_apply_uart_channel_config(
 		int channel_id,
 		streaming chanend cTxUART,
@@ -653,6 +664,7 @@ static int re_apply_uart_channel_config(
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 static int parse_uart_command_data(
 		streaming chanend cWbSvr2AppMgr,
 		streaming chanend cTxUART,
@@ -749,14 +761,12 @@ static int parse_uart_command_data(
             uart_channel_config[index_uart].char_len    = ui_command[5];
             uart_channel_config[index_uart].telnet_port = ui_command[6];
 
-            //re_apply_uart_channel_config(uart_channel_config[index_uart], cTxUART, cRxUART);
             re_apply_uart_channel_config(index_uart, cTxUART, cRxUART);
             //TODO: Channel backup may be required and need to be reconfigured upon failure
             //pending_cmd_to_send.flag = 1;
             //pending_cmd_to_send.cmd_type = ui_command[0];
             pending_cmd_to_send.uart_id = ui_command[1]; //UART Id
         }
-
     	/* Form response and send it back to channel */
         for (i = 0; i < NUM_UI_PARAMS; i++)
         {
@@ -797,6 +807,7 @@ static int parse_uart_command_data(
  *  \return	None
  *
  */
+#pragma unsafe arrays
 void app_manager_handle_uart_data(
 		streaming chanend cWbSvr2AppMgr,
 		streaming chanend cAppMgr2WbSvr,

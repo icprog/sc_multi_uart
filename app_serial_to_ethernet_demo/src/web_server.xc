@@ -100,6 +100,7 @@ implementation
 *  \return		1 		on success
 *
 **/
+#pragma unsafe arrays
 static int valid_telnet_port(unsigned int port_num)
 {
 	int i;
@@ -124,6 +125,7 @@ static int valid_telnet_port(unsigned int port_num)
 *  \return	None
 *
 **/
+#pragma unsafe arrays
 static int fetch_conn_id_for_uart_id(int uart_id)
 {
 	int i = 0;
@@ -168,6 +170,7 @@ static int fetch_conn_id_for_uart_id(int uart_id)
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 void update_user_conn_details(xtcp_connection_t &conn)
 {
     int i;
@@ -206,6 +209,7 @@ void update_user_conn_details(xtcp_connection_t &conn)
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 void free_user_conn_details(xtcp_connection_t &conn)
 {
     int i;
@@ -248,6 +252,7 @@ void free_user_conn_details(xtcp_connection_t &conn)
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 void fetch_user_data(
 		xtcp_connection_t &conn,
 		char data)
@@ -305,6 +310,7 @@ void fetch_user_data(
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 static void modify_telnet_port(
 		chanend tcp_svr,
 		streaming chanend cWbSvr2AppMgr)
@@ -357,6 +363,7 @@ static void modify_telnet_port(
 *  \return	None
 *
 **/
+#pragma unsafe arrays
 static void send_data_to_client(
 		chanend tcp_svr,
 		streaming chanend cAppMgr2WbSvr)
@@ -408,6 +415,7 @@ static void send_data_to_client(
 *  \return			None
 *
 **/
+#pragma unsafe arrays
 #ifndef FLASH_THREAD
 static void process_user_data(
 		streaming chanend cWbSvr2AppMgr,
@@ -567,6 +575,7 @@ static void process_user_data(
 *  \return	None
 *
 **/
+#pragma unsafe arrays
 #ifndef FLASH_THREAD
 void web_server_handle_event(
 		chanend tcp_svr,
@@ -692,6 +701,7 @@ void web_server_handle_event(
 *  \return	None
 *
 **/
+#pragma unsafe arrays
 #ifndef FLASH_THREAD
 void web_server(
 		chanend tcp_svr,
@@ -710,8 +720,8 @@ void web_server(
   unsigned processUserDataTS;
 
   int config_address, flash_index_page_config, flash_length_config, i;
-  char flash_data[FLASH_SIZE_PAGE];
-  char r_data[FLASH_SIZE_PAGE];
+  char flash_data[10];
+  char r_data[UI_COMMAND_LENGTH];
   int WbSvr2AppMgr_uart_data;
   int AppMgr2WbSvr_uart_data;
 
@@ -746,13 +756,13 @@ void web_server(
   parse_client_request(cWbSvr2AppMgr,
                        flash_data,
                        r_data,
-                       FLASH_SIZE_PAGE);
+                       UI_COMMAND_LENGTH);
 #else //FLASH_THREAD
   parse_client_request(cWbSvr2AppMgr,
                        cPersData,
                        flash_data,
                        r_data,
-                       FLASH_SIZE_PAGE);
+                       UI_COMMAND_LENGTH);
 #endif //FLASH_THREAD
 
   // Loop forever processing TCP events

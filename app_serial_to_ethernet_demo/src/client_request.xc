@@ -22,10 +22,12 @@ include files
 #include "common.h"
 #include "debug.h"
 #include <string.h>
+#include <print.h>
 
 /*---------------------------------------------------------------------------
 constants
 ---------------------------------------------------------------------------*/
+//#define CR_DEBUG 1
 
 /*---------------------------------------------------------------------------
 ports and clocks
@@ -72,6 +74,12 @@ static void create_get_command(char cc_data[], int cc_channel);
 
 static void create_set_command(char cc_data[], int cc_channel, int index);
 
+static int exchange_data_with_am(streaming chanend cWbSvr2AppMgr,
+                                 char data[],
+                                 char response[],
+                                 int start,
+                                 int end);
+
 /*---------------------------------------------------------------------------
 implementation
 ---------------------------------------------------------------------------*/
@@ -83,6 +91,7 @@ implementation
 *  \param yyy    description of yyy
 *
 **/
+#pragma unsafe arrays
 #ifndef FLASH_THREAD
 int parse_client_request(streaming chanend cWbSvr2AppMgr,
                          char data[],
@@ -99,8 +108,10 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
     char rtnval;
     char done = 0;
     char command;
-    int i, j, k, ix_start, ix_end, config_address, temp_start, temp_end;
+    int i, j, k, ix_start, ix_end, config_address;
     char flash_data[FLASH_SIZE_PAGE];
+
+    k = 0;
 
     // capture first config start marker
     ix_start = get_marker_index(data, data_length, MARKER_START);
@@ -119,27 +130,37 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
     {
         case CMD_CONFIG_GET:
         {
-            // send to app_manager
-            send_to_channel(cWbSvr2AppMgr, data, ix_start, ix_end);
-            // get response from app_manager
-            get_response_data(cWbSvr2AppMgr, response);
-
+#ifdef CR_DEBUG
+            printstrln("CR: GET request");
+#endif
+            // exchange data with am
+            exchange_data_with_am(cWbSvr2AppMgr, data, response, ix_start, ix_end);
+#ifdef CR_DEBUG
+            printstrln("CR: GET request completed");
+#endif
             break;
         } // case CMD_CONFIG_GET:
 
         case CMD_CONFIG_SET:
         {
-            // send to app_manager
-            send_to_channel(cWbSvr2AppMgr, data, ix_start, ix_end);
-            // get response from app_manager
-            get_response_data(cWbSvr2AppMgr, response);
+#ifdef CR_DEBUG
+            printstrln("CR: SET request");
+#endif
+            // exchange data with am
+            exchange_data_with_am(cWbSvr2AppMgr, data, response, ix_start, ix_end);
             /* Send SET command complete */
             cWbSvr2AppMgr <: UART_SET_END_FROM_APP_TO_UART;
+#ifdef CR_DEBUG
+            printstrln("CR: SET request completed");
+#endif
             break;
         } // case CMD_CONFIG_SET:
 
         case CMD_CONFIG_SAVE:
         {
+#ifdef CR_DEBUG
+            printstrln("CR: SAVE request");
+#endif
             // get flash config address
 #ifndef FLASH_THREAD
             config_address = get_flash_config_address();
@@ -148,7 +169,6 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
 #endif //FLASH_THREAD
 
             // get settings for each config from app_manager
-            // TODO: flash_data[0] must contain validity flag for settings in flash
             k = 0;
             flash_data[k] = FLASH_VALID_CONFIG_PRESENT; k++;
 
@@ -156,16 +176,14 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
             {
                 // replace command and channel number to get data from app_manager
                 create_get_command(data, i);
-                // send to app_manager
-                send_to_channel(cWbSvr2AppMgr, data, 0, 6);
-                // get response form app_manager
-                get_response_data(cWbSvr2AppMgr, response);
+                // exchange data with am
+                exchange_data_with_am(cWbSvr2AppMgr, data, response, 0, 6);
                 // find marker positions in the response from app_manager
-                temp_start = get_marker_index(response, UI_COMMAND_LENGTH, MARKER_START);
-                temp_end = get_marker_index(response, UI_COMMAND_LENGTH, MARKER_END);
+                ix_start = get_marker_index(response, UI_COMMAND_LENGTH, MARKER_START);
+                ix_end = get_marker_index(response, UI_COMMAND_LENGTH, MARKER_END);
                 // flash_data is one big char array that must be stored in flash
                 // append response to flash_data
-                for(j = temp_start; j <= temp_end; j++)
+                for(j = ix_start; j <= ix_end; j++)
                 {
                     flash_data[k] = response[j]; k++;
                 }
@@ -180,12 +198,18 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
                          config_address,
                          cPersData);
 #endif //FLASH_THREAD
+#ifdef CR_DEBUG
+            printstrln("CR: completed SAVE");
+#endif
 
             break;
         } // case CMD_CONFIG_SAVE:
 
         case CMD_CONFIG_RESTORE:
         {
+#ifdef CR_DEBUG
+            printstrln("CR: RESTORE request");
+#endif
             // get flash config address
 #ifndef FLASH_THREAD
             config_address = get_flash_config_address();
@@ -199,28 +223,31 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
 
             // check for configuration present in flash
             if(flash_data[0] != FLASH_VALID_CONFIG_PRESENT)
-            {}
+            {
+                response[0] = MARKER_END;
+            }
             else
             {
                 // decode data from flash and store this UART settings
                 for(i = 0; i < UART_APP_TX_CHAN_COUNT; i++)
                 {
                     // find markers stored in flash
-                    temp_start = get_marker_index(flash_data, FLASH_SIZE_PAGE, MARKER_START);
-                    temp_end = get_marker_index(flash_data, FLASH_SIZE_PAGE, MARKER_END);
+                    ix_start = get_marker_index(flash_data, FLASH_SIZE_PAGE, MARKER_START);
+                    ix_end = get_marker_index(flash_data, FLASH_SIZE_PAGE, MARKER_END);
                     // replace command and channel
-                    create_set_command(flash_data, i, temp_start);
-                    // send data to app_manager
-                    send_to_channel(cWbSvr2AppMgr, flash_data, temp_start, temp_end);
-                    // get response from app_manager
-                    get_response_data(cWbSvr2AppMgr, response);
+                    create_set_command(flash_data, i, ix_start);
+                    // exchange data with am
+                    exchange_data_with_am(cWbSvr2AppMgr, flash_data, response, ix_start, ix_end);
                     // replace previous data with zero to avoid marker find above
-                    replace_with_zero(flash_data, 0, temp_end);
+                    replace_with_zero(flash_data, 0, ix_end);
                 }
             }
 
             /* Send signal as Restore command complete */
             cWbSvr2AppMgr <: UART_RESTORE_END_FROM_APP_TO_UART;
+#ifdef CR_DEBUG
+            printstrln("CR: completed RESTORE");
+#endif
             break;
         } // case CMD_CONFIG_RESTORE:
 
@@ -243,6 +270,27 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
 *  \param yyy    description of yyy
 *
 **/
+#pragma unsafe arrays
+static int exchange_data_with_am(streaming chanend cWbSvr2AppMgr,
+                                 char data[],
+                                 char response[],
+                                 int start,
+                                 int end)
+{
+    // send data to app_manager
+    send_to_channel(cWbSvr2AppMgr, data, start, end);
+    // get response from app_manager
+    get_response_data(cWbSvr2AppMgr, response);
+}
+
+/** =========================================================================
+*  Description
+*
+*  \param xxx    description of xxx
+*  \param yyy    description of yyy
+*
+**/
+#pragma unsafe arrays
 static int get_marker_index(char gmi_data[], int gmi_length, char gmi_marker)
 {
     int i;
@@ -269,13 +317,20 @@ static int get_marker_index(char gmi_data[], int gmi_length, char gmi_marker)
 *  \param yyy    description of yyy
 *
 **/
+#pragma unsafe arrays
 static void get_response_data(streaming chanend cWbSvr2AppMgr, char grd_response[])
 {
     int done = 0;
     int i = 0;
+#ifdef CR_DEBUG
+    printstr("CR: Response from am: ");
+#endif
     do
     {
         cWbSvr2AppMgr :> grd_response[i];
+#ifdef CR_DEBUG
+            printchar(grd_response[i]);
+#endif
         if(grd_response[i] == MARKER_END)
         {
             done = 1;
@@ -285,6 +340,9 @@ static void get_response_data(streaming chanend cWbSvr2AppMgr, char grd_response
             i++;
         }
     } while(done == 0);
+#ifdef CR_DEBUG
+    printstrln("");
+#endif
 }
 
 /** =========================================================================
@@ -294,6 +352,7 @@ static void get_response_data(streaming chanend cWbSvr2AppMgr, char grd_response
 *  \param yyy    description of yyy
 *
 **/
+#pragma unsafe arrays
 static void send_to_channel(streaming chanend cWbSvr2AppMgr,
                             char stc_data[],
                             int stc_start,
@@ -301,10 +360,19 @@ static void send_to_channel(streaming chanend cWbSvr2AppMgr,
 {
     int i;
 	cWbSvr2AppMgr <: UART_CMD_FROM_APP_TO_UART;
+#ifdef CR_DEBUG
+    printstr("CR: Sending  to   am: ");
+#endif
     for(i = stc_start; i <= stc_end; i++)
     {
         cWbSvr2AppMgr <: stc_data[i];
+#ifdef CR_DEBUG
+        printchar(stc_data[i]);
+#endif
     }
+#ifdef CR_DEBUG
+    printstrln("");
+#endif
 }
 
 /** =========================================================================
@@ -314,6 +382,7 @@ static void send_to_channel(streaming chanend cWbSvr2AppMgr,
  *  \param int     length of character array
  *
  **/
+#pragma unsafe arrays
 static void clear_char_array(char c[], int length)
 {
     int i;
@@ -331,12 +400,13 @@ static void clear_char_array(char c[], int length)
  *  \param int     end index to clear
  *
  **/
+#pragma unsafe arrays
 static void replace_with_zero(char rwz_c[], int rwz_start, int rwz_end)
 {
     int i;
     for (i = rwz_start; i <= rwz_end; i++)
     {
-        rwz_c[i] = 0;
+        rwz_c[i] = '0';
     }
 }
 
@@ -347,6 +417,7 @@ static void replace_with_zero(char rwz_c[], int rwz_start, int rwz_end)
  *  \param int     length of character array
  *
  **/
+#pragma unsafe arrays
 #ifndef FLASH_THREAD
 static int get_flash_config_address()
 #else //FLASH_THREAD
@@ -354,7 +425,6 @@ static int get_flash_config_address(chanend cPersData)
 #endif //FLASH_THREAD
 {
     int flash_index_page_config, flash_length_config;
-    int flash_size_config;
     int config_address = 0;
 
     // get the location of last file
@@ -371,6 +441,9 @@ static int get_flash_config_address(chanend cPersData)
                                         flash_length_config,
                                         cPersData);
 #endif //FLASH_THREAD
+#ifdef CR_DEBUG
+    printstr("CR: Config Address: "); printintln(config_address);
+#endif
 
     return config_address;
 }
@@ -382,6 +455,7 @@ static int get_flash_config_address(chanend cPersData)
  *  \param int     length of character array
  *
  **/
+#pragma unsafe arrays
 static void create_get_command(char cc_data[], int cc_channel)
 {
     cc_data[0] = MARKER_START;
@@ -400,6 +474,7 @@ static void create_get_command(char cc_data[], int cc_channel)
  *  \param int     length of character array
  *
  **/
+#pragma unsafe arrays
 static void create_set_command(char cc_data[], int cc_channel, int index)
 {
     cc_data[index + 1] = CMD_CONFIG_SET;

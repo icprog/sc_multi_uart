@@ -49,7 +49,7 @@ on stdcore[0] : fl_SPIPorts flash_ports =
   PORT_SPI_SS,
   PORT_SPI_CLK,
   PORT_SPI_MOSI,
-  XS1_CLKBLK_3
+  XS1_CLKBLK_5 //XS1_CLKBLK_3
 };
 
 /* MUART TX port configuration */
@@ -118,9 +118,9 @@ on stdcore[0]: mii_interface_t mii =
     PORT_ETH_FAKE,
   };
 
-on stdcore[0]: out port p_reset = XS1_PORT_8D;
+//on stdcore[0]: out port p_reset = XS1_PORT_8D;
 on stdcore[0]: smi_interface_t smi = { 0, PORT_ETH_MDIO_1, PORT_ETH_MDC_1 };
-on stdcore[0]: clock clk_smi = XS1_CLKBLK_5;
+//on stdcore[0]: clock clk_smi = XS1_CLKBLK_5;
 
 #endif //TWO_THREAD_ETH
 
@@ -267,10 +267,11 @@ int main(void)
             ethernet_getmac_otp(otp_ports, mac_address);
 
             // Bring PHY out of reset
-            p_reset <: 0x2;
+            //p_reset <: 0x2;
 
             // Start server
-            uipSingleServer(clk_smi, null, smi, mii, xtcp, 1, ipconfig, mac_address);
+            //uipSingleServer(clk_smi, null, smi, mii, xtcp, 1, ipconfig, mac_address);
+            uipSingleServer(null, smi, mii, xtcp, 1, ipconfig, mac_address);
         }
 #endif //TWO_THREAD_ETH
 

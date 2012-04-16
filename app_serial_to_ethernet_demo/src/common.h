@@ -51,7 +51,7 @@ constants
 #define MARKER_END          '@'
 
 #define NUM_UI_PARAMS		(6 + 1) //1 for command type (added internally)
-#define UI_COMMAND_LENGTH	64 //TODO: Polarity parameter is not yet accounted
+#define UI_COMMAND_LENGTH	40 //TODO: Polarity parameter is not yet accounted
 
 /*---------------------------------------------------------------------------
 typedefs

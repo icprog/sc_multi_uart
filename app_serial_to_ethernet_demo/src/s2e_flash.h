@@ -36,6 +36,9 @@ constants
 // indicate if there is a config present in flash
 #define FLASH_VALID_CONFIG_PRESENT  '$'
 
+#define S2E_FLASH_ERROR             -1
+#define S2E_FLASH_OK                0
+
 /*---------------------------------------------------------------------------
 ports and clocks
 ---------------------------------------------------------------------------*/
@@ -65,11 +68,11 @@ prototypes
 #ifndef FLASH_THREAD
 int flash_get_config_address(int last_rom_page, int last_rom_length);
 
-void flash_read_rom(int page, char data[]);
+int flash_read_rom(int page, char data[]);
 
-void flash_write_config(int address, char data[]);
+int flash_write_config(int address, char data[]);
 
-void flash_read_config(int address, char data[]);
+int flash_read_config(int address, char data[]);
 #else //FLASH_THREAD
 void flash_data_access(chanend cPersData);
 
