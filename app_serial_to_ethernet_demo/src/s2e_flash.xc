@@ -48,7 +48,7 @@ fl_DeviceSpec myFlashDevices[] =
  FL_DEVICE_NUMONYX_M25P16,
 };
 
-
+// Details of webpage files generated from the script
 fsdata_t fsdata[] =
 {
 		{ "/index.html", 0, 4827 },
@@ -63,9 +63,7 @@ fsdata_t fsdata[] =
  prototypes
  ---------------------------------------------------------------------------*/
 int read_from_flash(int address, char data[]);
-int write_to_flash(int address, char data[]);
 int connect_flash();
-int get_flash_config_address(int last_rom_page, int last_rom_length);
 int get_flash_data_page_address(int data_page);
 
 /*---------------------------------------------------------------------------
@@ -100,9 +98,8 @@ int read_from_flash(int address, char data[])
  *
  **/
 #pragma unsafe arrays
-int write_to_flash(int address, char data[])
+int flash_write_config(int address, char data[])
 {
-    int address_copy = address;
     int ix_sector;
     int num_sectors;
     int sector;
@@ -141,8 +138,6 @@ int write_to_flash(int address, char data[])
 /** =========================================================================
  *  connect_flash
  *
- *  \param
- *
  **/
 #pragma unsafe arrays
 int connect_flash()
@@ -179,7 +174,7 @@ int connect_flash()
  *
  **/
 #pragma unsafe arrays
-int get_flash_config_address(int last_rom_page, int last_rom_length)
+int flash_get_config_address(int last_rom_page, int last_rom_length)
 {
     int total_rom_bytes;
     int temp;
@@ -247,18 +242,6 @@ int get_flash_data_page_address(int data_page)
 }
 
 #ifndef FLASH_THREAD
-/** =========================================================================
-*  flash_get_config_address
-*  \param last_rom_page: page number of the last fs file
-*  \param last_rom_length: length of the last fs file
-*
-**/
-int flash_get_config_address(int last_rom_page, int last_rom_length)
-{
-    int address;
-    address = get_flash_config_address(last_rom_page, last_rom_length);
-    return address;
-}
 
 /** =========================================================================
 *  flash_read_rom
@@ -277,17 +260,6 @@ int flash_read_rom(int page, char data[])
     read_from_flash(address, data);
     // return ok
     return S2E_FLASH_OK;
-}
-
-/** =========================================================================
-*  flash_write_config
-*  \param address: address to write to
-*  \param data[]: data to be stored in flash
-*
-**/
-int flash_write_config(int address, char data[])
-{
-    return write_to_flash(address, data);
 }
 
 /** =========================================================================
@@ -342,7 +314,7 @@ void flash_data_access(chanend cPersData)
                         cPersData :> flash_page_data[i];
                     }
                     // write config
-                    write_to_flash(address, flash_page_data);
+                    flash_write_config(address, flash_page_data);
 
                 }
                 else if(FLASH_CONFIG_READ == channel_data)
@@ -358,7 +330,7 @@ void flash_data_access(chanend cPersData)
                 {
                     cPersData :> rom_page;
                     cPersData :> rom_length;
-                    address = get_flash_config_address(rom_page, rom_length);
+                    address = flash_get_config_address(rom_page, rom_length);
                     cPersData <: address;
                 }
                 break;

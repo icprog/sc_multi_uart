@@ -474,22 +474,19 @@ void receive_uart_channel_data(
 *
 *  \param int buf_depth : reference to current depth of uart channel buffer
 *
-*  \return			1	when there is data to send
-*  					0	otherwise
+*  \return			None
 *
 **/
 #pragma unsafe arrays
-static int get_uart_channel_data(
+static void get_uart_channel_data(
 		streaming chanend cAppMgr2WbSvr)
 {
-	int ret_value = 0;
 	int i = 0;
 	int local_read_index = 0;
 
 	int channel_id = 0;
 	int read_index = 0;
 	unsigned int buf_depth = 0;
-	char buffer[] = "";
 
 	for (channel_id=0;channel_id<UART_RX_CHAN_COUNT;channel_id++)
 	{
@@ -540,11 +537,8 @@ static int get_uart_channel_data(
 		}
 		uart_rx_channel_state[channel_id].read_index = read_index;
 		uart_rx_channel_state[channel_id].buf_depth -= buf_depth; //= 0;
-
-		ret_value = 1;
 	}
 
-	return ret_value;
 }
 
 /** =========================================================================
@@ -774,6 +768,7 @@ static int parse_uart_command_data(
             cWbSvr2AppMgr <: MARKER_START;
             if (0 != ui_command[i])
             {
+            	/* Function similar to itoa */
                 while(0 != ui_command[i])
                 {
         			ui_param[j] = ui_command[i]%10;
@@ -900,6 +895,8 @@ void app_manager_handle_uart_data(
     			  fill_uart_channel_data(cWbSvr2AppMgr);
     		  }
     		  break;
+          default:
+            break;
         }
     }
 }

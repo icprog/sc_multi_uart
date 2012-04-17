@@ -22,7 +22,7 @@ include files
 #include "common.h"
 #include "debug.h"
 #include <string.h>
-#include <print.h>
+//#include <print.h>
 
 /*---------------------------------------------------------------------------
 constants
@@ -85,10 +85,12 @@ implementation
 ---------------------------------------------------------------------------*/
 
 /** =========================================================================
-*  Description
+*  parse_client_request
 *
-*  \param xxx    description of xxx
-*  \param yyy    description of yyy
+*  \param cWbSvr2AppMgr  webserver to appmanager channel
+*  \param data           data from the client
+*  \param response       response from appmanager
+*  \param data_length    length of data from client
 *
 **/
 #pragma unsafe arrays
@@ -105,13 +107,9 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
                          int data_length)
 #endif //FLASH_THREAD
 {
-    char rtnval;
-    char done = 0;
     char command;
     int i, j, k, ix_start, ix_end, config_address;
     char flash_data[FLASH_SIZE_PAGE];
-
-    k = 0;
 
     // capture first config start marker
     ix_start = get_marker_index(data, data_length, MARKER_START);
@@ -264,10 +262,13 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
 }
 
 /** =========================================================================
-*  Description
+*  exchange_data_with_am
 *
-*  \param xxx    description of xxx
-*  \param yyy    description of yyy
+*  \param cWbSvr2AppMgr  webserver to appmanager channel
+*  \param data           data from the client
+*  \param response       response from appmanager
+*  \param start          start index in data
+*  \param end            end index in data
 *
 **/
 #pragma unsafe arrays
@@ -284,10 +285,11 @@ static int exchange_data_with_am(streaming chanend cWbSvr2AppMgr,
 }
 
 /** =========================================================================
-*  Description
+*  get_marker_index
 *
-*  \param xxx    description of xxx
-*  \param yyy    description of yyy
+*  \param gmi_data    data array in which the marker must be searched
+*  \param gmi_length  length of gmi_data
+*  \param gmi_marker  marker to search for
 *
 **/
 #pragma unsafe arrays
@@ -311,10 +313,10 @@ static int get_marker_index(char gmi_data[], int gmi_length, char gmi_marker)
 }
 
 /** =========================================================================
-*  Description
+*  get_response_data
 *
-*  \param xxx    description of xxx
-*  \param yyy    description of yyy
+*  \param cWbSvr2AppMgr  webserver to appmanager channel
+*  \param grd_response   response from appmanager
 *
 **/
 #pragma unsafe arrays
@@ -346,10 +348,12 @@ static void get_response_data(streaming chanend cWbSvr2AppMgr, char grd_response
 }
 
 /** =========================================================================
-*  Description
+*  send_to_channel
 *
-*  \param xxx    description of xxx
-*  \param yyy    description of yyy
+*  \param cWbSvr2AppMgr  webserver to appmanager channel
+*  \param stc_data       data from the client
+*  \param stc_start      start index in data
+*  \param stc_end        end index in data
 *
 **/
 #pragma unsafe arrays
@@ -378,8 +382,8 @@ static void send_to_channel(streaming chanend cWbSvr2AppMgr,
 /** =========================================================================
  *  clear_char_array
  *
- *  \param char    character array to clear
- *  \param int     length of character array
+ *  \param c       character array to clear
+ *  \param length  length of character array
  *
  **/
 #pragma unsafe arrays
@@ -411,10 +415,7 @@ static void replace_with_zero(char rwz_c[], int rwz_start, int rwz_end)
 }
 
 /** =========================================================================
- *  clear_char_array
- *
- *  \param char    character array to clear
- *  \param int     length of character array
+ *  get_flash_config_address
  *
  **/
 #pragma unsafe arrays
@@ -449,10 +450,10 @@ static int get_flash_config_address(chanend cPersData)
 }
 
 /** =========================================================================
- *  clear_char_array
+ *  create_get_command
  *
- *  \param char    character array to clear
- *  \param int     length of character array
+ *  \param cc_data     data to fill with GET command
+ *  \param cc_channel  UART channel ID
  *
  **/
 #pragma unsafe arrays
@@ -468,10 +469,11 @@ static void create_get_command(char cc_data[], int cc_channel)
 }
 
 /** =========================================================================
- *  clear_char_array
+ *  create_set_command
  *
- *  \param char    character array to clear
- *  \param int     length of character array
+ *  \param cc_data     data to fill with SET command
+ *  \param cc_channel  UART channel ID
+ *  \param index       index in cc_data where the SET command must be issued
  *
  **/
 #pragma unsafe arrays
