@@ -26,6 +26,7 @@ constants
 // required for calculation of config_address and other stuff
 #define FLASH_SIZE_PAGE             256
 #define WPAGE_NUM_FILES             2
+#define WPAGE_FILE_NAME_LEN			32
 
 // flash_operation defines
 #define FLASH_ROM_READ              '@'
@@ -48,7 +49,7 @@ typedefs
 ---------------------------------------------------------------------------*/
 typedef struct
 {
-    char name[32];
+    char name[WPAGE_FILE_NAME_LEN];
     int  page;
     int  length;
 }fsdata_t;

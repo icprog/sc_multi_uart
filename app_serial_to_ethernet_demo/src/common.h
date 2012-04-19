@@ -28,11 +28,11 @@ constants
 //#define FLASH_THREAD
 /* Length of application buffer to hold UART channel data */
 #define UART_APP_TX_CHAN_COUNT		8 // Must be Same as UART_TX_CHAN_COUNT
-#define TX_CHANNEL_FIFO_LEN			32 //This is a common length between app server and data manager
-#define RX_CHANNEL_FIFO_LEN			32
+#define TX_CHANNEL_FIFO_LEN			16 //This is a common length between app server and data manager
+#define RX_CHANNEL_FIFO_LEN			16
 #ifndef NUM_HTTPD_CONNECTIONS
 /* Maximum number of concurrent connections */
-#define NUM_HTTPD_CONNECTIONS 2
+#define NUM_HTTPD_CONNECTIONS		1
 #endif //NUM_HTTPD_CONNECTIONS
 /* Configure web browser port number */
 #define HTTP_PORT					80
@@ -51,7 +51,7 @@ constants
 #define MARKER_END          '@'
 
 #define NUM_UI_PARAMS		(6 + 1) //1 for command type (added internally)
-#define UI_COMMAND_LENGTH	40 //TODO: Polarity parameter is not yet accounted
+#define UI_COMMAND_LENGTH	35 //TODO: Polarity parameter is not yet accounted
 
 /*---------------------------------------------------------------------------
 typedefs

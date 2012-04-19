@@ -152,7 +152,7 @@ void parse_http_request(httpd_state_t *hs,
 {
     int channel_id = 0;
     int request_type;
-    char temp_file_name[32];
+    char temp_file_name[WPAGE_FILE_NAME_LEN];
     int i, j;
 
     // Return if we have data already

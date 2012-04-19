@@ -29,13 +29,13 @@
 #include "multi_uart_rxtx.h"
 #include <flash.h>
 #include "s2e_flash.h"
-#define MUART_CORE_NUM	1
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
 //#define	DHCP_CONFIG	1	/* Set this to use DHCP */
-#define		TWO_THREAD_ETH		1 //Enable this to use 2 thread ethernet component
+#define		TWO_THREAD_ETH		1 /* Enable this to use 2 thread ethernet component */
 #define 	XSCOPE_EN 0     /* set this to 1 for xscope printing */
+#define 	MUART_CORE_NUM		0 /* Core to place MUART comp and APP Manager Thread */
 
 #if XSCOPE_EN == 1
 #include <xscope.h>

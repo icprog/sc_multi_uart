@@ -755,6 +755,7 @@ static int parse_uart_command_data(
             uart_channel_config[index_uart].char_len    = ui_command[5];
             uart_channel_config[index_uart].telnet_port = ui_command[6];
 
+            //TODO: MUART Reconfig Bug on Core 0 to be resolved
             re_apply_uart_channel_config(index_uart, cTxUART, cRxUART);
             //TODO: Channel backup may be required and need to be reconfigured upon failure
             //pending_cmd_to_send.flag = 1;
@@ -775,6 +776,8 @@ static int parse_uart_command_data(
                     ui_command[i] = ui_command[i]/10;
                     j++;
                 }
+
+                /* Need to send the data in MSB -> LSB order */
                 while(0 != j)
                 {
                     cWbSvr2AppMgr <: (char)(ui_param[j-1] + 48);
