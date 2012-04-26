@@ -44,6 +44,9 @@
                         <Port Location="XS1_PORT_1N" Name="PORT_ETH_MDC_1"/>
                         <Port Location="XS1_PORT_1O" Name="PORT_ETH_INT_1"/>
                         <Port Location="XS1_PORT_1P" Name="PORT_ETH_ERR_1"/>
+                         <!--MUART PORTS-->
+                         <Port Location="XS1_PORT_8B"  Name="PORT_UART_TX"/>
+                         <Port Location="XS1_PORT_8A"  Name="PORT_UART_RX"/>
                     </Core>
                 </Node>
                 <Node Id="1" InPackageId="1" Type="XS1-L1A" Oscillator="25MHz" SystemFrequency="500MHz">
@@ -72,10 +75,6 @@
                         <Port Location="XS1_PORT_1N" Name="PORT_ETH_MDC_3"/>
                         <Port Location="XS1_PORT_1O" Name="PORT_ETH_INT_3"/>
                         <Port Location="XS1_PORT_1P" Name="PORT_ETH_ERR_3"/>
-
-                         <!--MUART PORTS-->
-                         <Port Location="XS1_PORT_8B"  Name="PORT_UART_TX"/>
-                         <Port Location="XS1_PORT_8A"  Name="PORT_UART_RX"/>
                     </Core>
                 </Node>
             </Nodes>

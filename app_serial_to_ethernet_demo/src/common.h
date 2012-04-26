@@ -28,11 +28,11 @@ constants
 //#define FLASH_THREAD
 /* Length of application buffer to hold UART channel data */
 #define UART_APP_TX_CHAN_COUNT		8 // Must be Same as UART_TX_CHAN_COUNT
-#define TX_CHANNEL_FIFO_LEN			16 //This is a common length between app server and data manager
-#define RX_CHANNEL_FIFO_LEN			16
+#define TX_CHANNEL_FIFO_LEN			48 //This is a common length between app server and data manager
+#define RX_CHANNEL_FIFO_LEN			48
 #ifndef NUM_HTTPD_CONNECTIONS
 /* Maximum number of concurrent connections */
-#define NUM_HTTPD_CONNECTIONS		1
+#define NUM_HTTPD_CONNECTIONS		2
 #endif //NUM_HTTPD_CONNECTIONS
 /* Configure web browser port number */
 #define HTTP_PORT					80

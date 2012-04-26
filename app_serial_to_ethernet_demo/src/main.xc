@@ -8,13 +8,13 @@
  Filename: main.xc
  Project : app_serial_to_ethernet_demo
  Author  : XMOS Ltd
- Version : 1v0
+ Version : 1v1v2
  Purpose : This file defines resources (ports, clocks, threads and interfaces)
  required to implement serial to ethernet bridge application demostration
  -----------------------------------------------------------------------------
 
  ===========================================================================*/
- 
+
 /*---------------------------------------------------------------------------
  include files
  ---------------------------------------------------------------------------*/
@@ -255,7 +255,7 @@ int main(void)
 	                mac_tx,
 	                connect_status,
 	                reset);
-	            
+
 	            /* The TCP/IP server thread */
 	            on stdcore[0]: uip_server(mac_rx[0],
 	                mac_tx[0],
@@ -297,7 +297,7 @@ int main(void)
 	            on stdcore[0]: dummy();
 	            on stdcore[0]: dummy();
 	            */
-	            
+
 	            /* web server thread for handling and servicing http requests
 	            * and telnet data communication */
 #ifndef FLASH_THREAD
@@ -305,14 +305,14 @@ int main(void)
 #else //FLASH_THREAD
 	            on stdcore[0]: web_server(xtcp[0], cWbSvr2AppMgr, cAppMgr2WbSvr, cPersData);
 #endif //FLASH_THREAD
-	            
+
 	            /* The multi-uart application manager thread to handle uart
 	            * data communication to web server clients */
 	            on stdcore[MUART_CORE_NUM]: app_manager_handle_uart_data(cWbSvr2AppMgr, cAppMgr2WbSvr, cTxUART, cRxUART);
 #if 0
 	            /* Multi-uart transmit thread */
 	            on stdcore[1]: run_multi_uart_tx( cTxUART, uart_tx_ports, uart_clock_tx );
-	            
+
 	            /* Multi-uart receive thread */
 	            on stdcore[1]: run_multi_uart_rx( cRxUART, uart_rx_ports, uart_clock_rx );
 #else

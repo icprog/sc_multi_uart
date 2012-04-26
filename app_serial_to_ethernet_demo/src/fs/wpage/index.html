@@ -1,6 +1,7 @@
 <html><head>
-<META HTTP-EQUIV='Pragma' CONTENT='no-cache'>
+<META HTTP-EQUIV='Cache-Control' CONTENT='no-cache'>
 <META HTTP-EQUIV='Expires' CONTENT='-1'>
+<META HTTP-EQUIV='Pragma' CONTENT='no-cache'>
 <title>XMOS Serial to Ethernet</title>
 <script type='text/javascript'>
 // <!--
@@ -63,7 +64,7 @@ function createRequest(uartReqType)
    {
       request = '~' + uartReqType + '~~' + wpdata[1] + '~@';
    }
-   httpRequest.open('GET', request, true);
+   httpRequest.open('GET', request+Math.random(), true);
    httpRequest.send(null);
    httpRequest.onreadystatechange = function() { alertContents(httpRequest); };
 }
