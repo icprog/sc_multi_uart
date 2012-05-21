@@ -33,8 +33,13 @@
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
-//#define	DHCP_CONFIG	1	/* Set this to use DHCP */
+#define	DHCP_CONFIG	1	/* Set this to use DHCP */
 #define		TWO_THREAD_ETH		1 //Enable this to use 2 thread ethernet component
+#define 	XSCOPE_EN 0     /* set this to 1 for xscope printing */
+
+#if XSCOPE_EN == 1
+#include <xscope.h>
+#endif
 
 /*---------------------------------------------------------------------------
  ports and clocks
@@ -259,6 +264,14 @@ int main(void)
             uipSingleServer(clk_smi, null, smi, mii, xtcp, 1, ipconfig, mac_address);
         }
 #endif //TWO_THREAD_ETH
+
+#if XSCOPE_EN == 1
+	            on stdcore[0]: {
+	                xscope_register (0 , 0 , " " , 0, " " );
+	                xscope_config_io ( XSCOPE_IO_BASIC );
+	                dummy();
+	            }
+#endif
 
 #ifdef FLASH_THREAD
 	            on stdcore[0]: flash_data_access(cPersData);

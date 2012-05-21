@@ -27,6 +27,7 @@
 #include "s2e_flash.h"
 #include "common.h"
 #include "client_request.h"
+#include <stdlib.h>
 
 #define ENABLE_XSCOPE 0
 
@@ -51,6 +52,7 @@ typedef enum
 {
     TYPE_HTTP_PORT,
     TYPE_TELNET_PORT,
+	TYPE_UDP_PORT,
     TYPE_UNSUPP_PORT,
 } AppPorts;
 
@@ -124,10 +126,35 @@ int gPollForTelnetCommandData; //0 Initially reset this
 int g_UartTxNumToSend;
 char g_telnet_recd_data_buffer[XTCP_CLIENT_BUF_SIZE];
 char g_telnet_actual_data_buffer[XTCP_CLIENT_BUF_SIZE];
+/* Broadcast Discovery Feature related declarations */
+xtcp_connection_t g_BroadcastServerConn;
+xtcp_connection_t g_BroadcastResponseConn;
+unsigned char g_BroadCastRecvBuffer[XTCP_UDP_RECV_BUF_SIZE];
+unsigned char g_BroadcastRespBuffer[XTCP_UDP_RECV_BUF_SIZE];
+int g_ProcessBroadcastData;
+xtcp_ipconfig_t g_ipconfig;
+unsigned char g_mac_addr[6];
+int g_int_ipconfig[4];
+int g_int_mac_addr[6];
+char g_FirmwareVer[10] = "1.1.2";
+//char g_RespString[80] = "XMOS S2E VER:a.b.c;MAC:xx:xx:xx:xx:xx:xx;IP:xxx.xxx.xxx.xxx";
+char g_RespString[30] = "XMOS S2E VER:;MAC:;IP:";
+char g_UdpQueryString[20] = "XMOS S2E REPLY";
+char g_UdpIpChangeCmdString[20] = "XMOS S2E IPCHANGE ";
 
 /*---------------------------------------------------------------------------
  implementation
  ---------------------------------------------------------------------------*/
+
+//**===================================================================
+void chip_reset(void)
+{
+	unsigned reg_value;
+	read_sswitch_reg(0,6,reg_value);
+	write_sswitch_reg(0,6,reg_value);
+	read_sswitch_reg(0x1000,6,reg_value);
+	write_sswitch_reg(0x1000,6,reg_value);
+}
 
 /** =========================================================================
  *  valid_telnet_port
@@ -469,7 +496,9 @@ static void process_user_data(streaming chanend cWbSvr2AppMgr,
 #endif //FLASH_THREAD
 {
     int read_index = 0;
-    if ((user_client_data_buffer.buf_depth > 0) && (user_client_data_buffer.buf_depth <= TX_CHANNEL_FIFO_LEN))
+
+    if ((user_client_data_buffer.buf_depth > 0) &&
+    		(user_client_data_buffer.buf_depth <= TX_CHANNEL_FIFO_LEN))
     {
         /* Check if it is a UART command through telnet command socket */
         if (TELNET_PORT_USER_CMDS == user_client_data_buffer.conn_local_port)
@@ -541,6 +570,294 @@ static void process_user_data(streaming chanend cWbSvr2AppMgr,
     } //If there is any client data
 }
 
+
+static void form_and_send_udp_response(chanend tcp_svr)
+{
+	  int i = 0;
+	  int RespIdx = 0;
+	  int RespStrIdx = 0;
+	  int itoa[4] = {0};
+	  int itoa_len = 0;
+
+	  do
+	  {
+		  g_BroadcastRespBuffer[RespIdx] = g_RespString[RespStrIdx];
+		  RespIdx++;
+		  RespStrIdx++;
+	  } while (':' != g_RespString[RespStrIdx]);
+
+	  g_BroadcastRespBuffer[RespIdx] = g_RespString[RespStrIdx];
+	  RespIdx++;
+	  RespStrIdx++;
+
+	  /* Get Version */
+	  i = 0;
+	  while ('\0' != g_FirmwareVer[i])
+	  {
+		  g_BroadcastRespBuffer[RespIdx] = g_FirmwareVer[i];
+		  RespIdx++;
+		  i++;
+	  }
+
+	  /* Get MAC Address */
+	  do
+	  {
+		  g_BroadcastRespBuffer[RespIdx] = g_RespString[RespStrIdx];
+		  RespIdx++;
+		  RespStrIdx++;
+	  } while (':' != g_RespString[RespStrIdx]);
+
+	  g_BroadcastRespBuffer[RespIdx] = g_RespString[RespStrIdx];
+	  RespIdx++;
+	  RespStrIdx++;
+#if 1 //MAC_SUPP
+#if 1
+	  for (i=0; i<6; i++)
+	  {
+
+		  g_int_mac_addr[i] = g_mac_addr[i];
+		  //printint(g_int_mac_addr[i]);
+		  itoa_len = 0;
+
+		  if (0 == g_int_mac_addr[i])
+		  {
+			  g_BroadcastRespBuffer[RespIdx] = (char) 0+48;
+			  RespIdx++;
+		  }
+		  else
+		  {
+			  /* Function similar to itoa */
+	          while(0 != g_int_mac_addr[i])
+	          {
+	        	  itoa[itoa_len] = g_int_mac_addr[i]%10;
+	        	  g_int_mac_addr[i] = g_int_mac_addr[i]/10;
+	        	  itoa_len++;
+	          }
+
+	          /* Store the data in MSB first format */
+	          while (0 != itoa_len)
+	          {
+	        	  g_BroadcastRespBuffer[RespIdx] = (char) itoa[itoa_len-1] + 48;
+	        	  RespIdx++;
+	        	  itoa_len--;
+	          }
+		  }
+
+          /* Last byte of Mac addr shud not ve ":" */
+		  if (i<5)
+		  {
+			  g_BroadcastRespBuffer[RespIdx] = ':';
+			  RespIdx++;
+		  }
+	  }
+#else
+	  for (i=0; i<5; i++)
+	  {
+		  printcharln(g_mac_addr[i]);
+		  g_BroadcastRespBuffer[RespIdx] = (unsigned char) g_mac_addr[i];
+		  RespIdx++;
+		  g_BroadcastRespBuffer[RespIdx] = ':';
+		  RespIdx++;
+	  }
+	  /* Copy last byte of Mac addr; this shud not ve ":"*/
+	  g_BroadcastRespBuffer[RespIdx] = (unsigned char) g_mac_addr[i];
+	  RespIdx++;
+#endif
+#endif //MAC_SUPP
+	  /* Get IP Address */
+	  do
+	  {
+		  g_BroadcastRespBuffer[RespIdx] = g_RespString[RespStrIdx];
+		  RespIdx++;
+		  RespStrIdx++;
+	  } while (':' != g_RespString[RespStrIdx]);
+
+	  g_BroadcastRespBuffer[RespIdx] = g_RespString[RespStrIdx];
+	  RespIdx++;
+	  RespStrIdx++;
+
+	  for (int i=0;i<4;i++)
+	  	{
+	  		g_int_ipconfig[i] = g_ipconfig.ipaddr[i];
+	      	//printintln(g_int_ipconfig[i]);
+#if 1
+	      	if (0 == g_int_ipconfig[i])
+	  		{
+				  g_BroadcastRespBuffer[RespIdx] = (char) 0+48;
+				  RespIdx++;
+	  		}
+	  		else
+	  		{
+	  			itoa_len = 0;
+
+	  			/* Function similar to itoa */
+	              while(0 != g_int_ipconfig[i])
+	              {
+	            	  itoa[itoa_len] = g_int_ipconfig[i]%10;
+	            	  g_int_ipconfig[i] = g_int_ipconfig[i]/10;
+	            	  itoa_len++;
+	              }
+	              /* Store the data in MSB first format */
+	              while (0 != itoa_len)
+	              {
+	            	  g_BroadcastRespBuffer[RespIdx] = (char) itoa[itoa_len-1] + 48;
+	            	  RespIdx++;
+	            	  itoa_len--;
+	              }
+	  		}
+
+	        if (i<3)
+	  		{
+	        	g_BroadcastRespBuffer[RespIdx] = '.';
+	      		RespIdx++;
+	  		}
+#else
+	        printstrln("IP addr:" );
+	      	printcharln(g_ipconfig.ipaddr[i]);
+	      	g_BroadcastRespBuffer[RespIdx] = (unsigned char) g_ipconfig.ipaddr[i];//+48;
+	      	RespIdx++;
+
+	        if (i<3)
+	  		{
+	        	g_BroadcastRespBuffer[RespIdx] = '.';
+	      		RespIdx++;
+	  		}
+#endif
+	  	}
+
+	  	/* Terminate the response string */
+	  	g_BroadcastRespBuffer[RespIdx] = '\0';
+
+	    xtcp_send(tcp_svr, g_BroadcastRespBuffer, RespIdx);//XTCP_UDP_RECV_BUF_SIZE);
+#if 0
+	    printstr("Sending Data  ");
+	    for (i=0;i<RespIdx;i++)
+	    {
+	    	printchar(g_BroadcastRespBuffer[i]);
+	    }
+	    printcharln('#');
+#endif
+	    g_ProcessBroadcastData = 0;
+}
+
+static void process_udp_query(chanend tcp_svr)
+{
+	int i=0;
+	int j = 0;
+	int k = 0;
+	int DecisionVar = 0;
+	unsigned char ip_cfg_char_recd[3];
+	xtcp_ipconfig_t ipconfig_to_flash;
+
+	/* Store UDP server data */
+	//memset(g_BroadCastRecvBuffer,0,XTCP_UDP_RECV_BUF_SIZE);
+	for (i=0; i<XTCP_UDP_RECV_BUF_SIZE; i++)
+	{
+		g_BroadCastRecvBuffer[i] = '\0';
+	}
+
+	xtcp_recv_count(tcp_svr, g_BroadCastRecvBuffer, XTCP_UDP_RECV_BUF_SIZE-1);
+//	printstrln(g_BroadCastRecvBuffer);
+
+	/* Check if UDP response connection is established,
+	 * respond to Broadcast connection port and
+	 * check UDP server is requesting S2E Response in proper string format */
+
+	if ((g_ipconfig.ipaddr[0]) || (g_ipconfig.ipaddr[1])) //Check to see if ip address is obtained or not
+	{
+		i = 0;
+		DecisionVar = 0;
+		k = 0;
+
+		while ('\0' != g_BroadCastRecvBuffer[i])
+		{
+			//default behavior: ignore the request
+			if (g_UdpQueryString[i] == g_BroadCastRecvBuffer[i])
+			{
+				i++;
+				if ('\0' == g_UdpQueryString[i])
+				{
+					/* Prepare a S2E response */
+					g_ProcessBroadcastData = 1;
+					break;
+				}
+				continue;
+			}
+			else if (g_UdpIpChangeCmdString[i] == g_BroadCastRecvBuffer[i])
+			{
+				i++;
+				if ('\0' == g_UdpIpChangeCmdString[i])
+				{
+					/* Extract ip address */
+					DecisionVar = 1;
+					break;
+				}
+				continue;
+			}
+			else
+			{
+				break;
+			}
+		}
+
+		while (DecisionVar && ('\0' != g_BroadCastRecvBuffer[i]))
+		{
+			/* Store ip address */
+			j = 0;
+			while(('.' != g_BroadCastRecvBuffer[i]) && (j < 3))
+			{
+				ip_cfg_char_recd[j] = g_BroadCastRecvBuffer[i];
+				j++;
+				i++;
+				DecisionVar = 2;
+			}
+			i++;
+
+			if (2 == j)
+			{
+				/* Move recd chars to LSB in case of ip less than 3 chars */
+				ip_cfg_char_recd[2] = ip_cfg_char_recd[1];
+				ip_cfg_char_recd[1] = ip_cfg_char_recd[0];
+				ip_cfg_char_recd[0] = '0';
+			}
+			else if (1 == j)
+			{
+				/* Move recd chars to LSB in case of ip less than 3 chars */
+				ip_cfg_char_recd[2] = ip_cfg_char_recd[0];
+				ip_cfg_char_recd[1] = '0';
+				ip_cfg_char_recd[0] = '0';
+			}
+
+			if (2 == DecisionVar)
+			{
+				ipconfig_to_flash.ipaddr[k] = (unsigned char) atoi(ip_cfg_char_recd);
+				k++;
+				DecisionVar = 1;
+			}
+		}
+	}
+
+	/* Flash IP address */
+	if (4 == k)
+	{
+		for (k=0;k<4;k++)
+		{
+			g_ipconfig.ipaddr[k] = ipconfig_to_flash.ipaddr[k];
+		}
+#if 1
+		printstrln("IP Change - Resending New IP");
+		g_ProcessBroadcastData = 1;
+#else
+		/* Soft reset the application */
+		{
+			printstrln("Resetting the application");
+			chip_reset();
+		}
+#endif
+	}
+
+}
+
 /** =========================================================================
  *  web_server_handle_event
  *
@@ -582,6 +899,9 @@ void web_server_handle_event(chanend tcp_svr,
     switch (conn.event)
     {
         case XTCP_IFUP:
+    	xtcp_get_ipconfig(tcp_svr, g_ipconfig);
+    	xtcp_get_mac_address(tcp_svr, g_mac_addr);
+        return;
         case XTCP_IFDOWN:
         case XTCP_ALREADY_HANDLED: return;
         default: break;
@@ -592,13 +912,21 @@ void web_server_handle_event(chanend tcp_svr,
     {
         app_port_type=TYPE_HTTP_PORT;
     }
-    else if ((valid_telnet_port(conn.local_port)) || (TELNET_PORT_USER_CMDS == conn.local_port))
+    else if ((INCOMING_UDP_PORT == conn.local_port) ||
+		     (OUTGOING_UDP_PORT == conn.local_port) ||
+		     (OUTGOING_UDP_PORT == conn.remote_port))
+    {
+	    app_port_type=TYPE_UDP_PORT;
+    }
+    else if ((valid_telnet_port(conn.local_port)) ||
+		    (TELNET_PORT_USER_CMDS == conn.local_port))
     {
         app_port_type=TYPE_TELNET_PORT;
     }
 
-    if ((app_port_type==TYPE_HTTP_PORT) || (app_port_type==TYPE_TELNET_PORT))
-    {
+    if ((app_port_type==TYPE_HTTP_PORT) ||
+	    (app_port_type==TYPE_TELNET_PORT) ||
+	    (app_port_type==TYPE_UDP_PORT)) {
         switch (conn.event)
         {
             case XTCP_NEW_CONNECTION:
@@ -613,6 +941,23 @@ void web_server_handle_event(chanend tcp_svr,
                 /* Note connection details so that data is manageable at server level */
                 update_user_conn_details(conn);
             }
+			else if (app_port_type==TYPE_UDP_PORT)
+			{
+    			if((INCOMING_UDP_PORT == conn.local_port) && (g_BroadcastServerConn.id < 1))//Init conn)
+    			{
+    				g_BroadcastServerConn = conn;
+
+    				/* Establish broadcast response connection */
+        			xtcp_connect(tcp_svr,
+        					OUTGOING_UDP_PORT,
+        					conn.remote_addr,
+        					XTCP_PROTOCOL_UDP);
+    			}
+    			else if (OUTGOING_UDP_PORT == conn.remote_port)
+    			{
+        			g_BroadcastResponseConn = conn;
+    			}
+			}
             break;
             case XTCP_RECV_DATA:
             if (app_port_type==TYPE_HTTP_PORT)
@@ -689,6 +1034,10 @@ void web_server_handle_event(chanend tcp_svr,
                     }
                 }
             }
+			else if (app_port_type==TYPE_UDP_PORT)
+			{
+				process_udp_query(tcp_svr);
+			}
             break;
             case XTCP_SENT_DATA:
             case XTCP_REQUEST_DATA:
@@ -714,19 +1063,47 @@ void web_server_handle_event(chanend tcp_svr,
                 else
                 telnet_buffered_send_handler(tcp_svr, conn);
             }
+			else if ((XTCP_SENT_DATA == conn.event) &&
+					 (app_port_type==TYPE_UDP_PORT) &&
+					 (conn.id == g_BroadcastResponseConn.id))
+			{
+    			xtcp_complete_send(tcp_svr);
+    			xtcp_close(tcp_svr, conn);
+			}
+			else if ((app_port_type==TYPE_UDP_PORT) &&
+					 (conn.id == g_BroadcastResponseConn.id))
+			{
+				form_and_send_udp_response(tcp_svr);
+			}
             break;
             case XTCP_TIMED_OUT:
             case XTCP_ABORTED:
             case XTCP_CLOSED:
-            if (app_port_type==TYPE_HTTP_PORT)
-            httpd_free_state(conn);
-            else if (app_port_type==TYPE_TELNET_PORT)
-            telnetd_free_state(conn);
-
-            free_user_conn_details(conn);
-            break;
-            default: break;
-        }
+			if (app_port_type==TYPE_HTTP_PORT)
+				httpd_free_state(conn);
+			else if (app_port_type==TYPE_TELNET_PORT)
+			{
+				telnetd_free_state(conn);
+				free_user_conn_details(conn);
+			}
+			
+			if (app_port_type==TYPE_UDP_PORT)
+			{
+				if (conn.id == g_BroadcastResponseConn.id)
+				{
+					g_BroadcastResponseConn.id = -1;
+					g_BroadcastServerConn.id = -1; //TBC
+				}
+				else if (conn.id == g_BroadcastServerConn.id)
+				{
+					g_BroadcastServerConn.id = -1;
+				}
+			}
+			break;
+			default:
+				// Ignore anything else
+				break;        
+		}
         conn.event = XTCP_ALREADY_HANDLED;
     }
     return;
@@ -883,6 +1260,10 @@ void web_server(chanend tcp_svr,
 
     /* Telnet port for executing user commands */
     telnetd_set_new_session(tcp_svr, TELNET_PORT_USER_CMDS);
+
+  	// Listen on the configured UDP port
+	xtcp_listen(tcp_svr, INCOMING_UDP_PORT, XTCP_PROTOCOL_UDP);
+
     processUserDataTimer :> processUserDataTS;
     processUserDataTS += PROCESS_USER_DATA_TMR_EVENT_INTRVL;
     // Get configuration from flash
@@ -954,7 +1335,13 @@ void web_server(chanend tcp_svr,
             web_server_handle_event(tcp_svr, conn, cWbSvr2AppMgr, cAppMgr2WbSvr, cPersData);
             break;
             case processUserDataTimer when timerafter (processUserDataTS) :> char _ :
-            if (gPollForUartDataToFetchFromUartRx)
+			if ((1 == g_ProcessBroadcastData) &&
+				(g_BroadcastResponseConn.id > 0))
+			{
+				xtcp_init_send(tcp_svr, g_BroadcastResponseConn);
+				g_ProcessBroadcastData = 0;
+			}
+            else if (gPollForUartDataToFetchFromUartRx)
             {
                 /* Send CT */
                 outct(cAppMgr2WbSvr, '1');

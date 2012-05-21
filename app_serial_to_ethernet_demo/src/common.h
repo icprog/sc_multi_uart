@@ -40,6 +40,9 @@ constants
 #define HTTP_PORT					80
 #define TELNET_PORT_USER_CMDS		23
 #define DEF_TELNET_PORT_START_VALUE	46
+#define INCOMING_UDP_PORT			15534//15541//
+#define XTCP_UDP_RECV_BUF_SIZE		80
+#define OUTGOING_UDP_PORT 			15533//15542//
 
 /* Channel communication parameters */
 #define CMD_CONFIG_GET      '1'
