@@ -25,6 +25,7 @@ constants
 ---------------------------------------------------------------------------*/
 // required for calculation of config_address and other stuff
 #define FLASH_SIZE_PAGE             256
+#define FLASH_IP_VER_SIZE			30
 #define WPAGE_NUM_FILES             2
 
 // flash_operation defines
@@ -32,7 +33,9 @@ constants
 #define FLASH_CONFIG_WRITE          '~'
 #define FLASH_CONFIG_READ           '!'
 #define FLASH_GET_CONFIG_ADDRESS    '#'
-
+#define FLASH_GET_NEXT_SECTOR_ADDRESS		'*'
+#define FLASH_IPVER_READ					'&'
+#define FLASH_IPVER_WRITE					'%'
 // indicate if there is a config present in flash
 #define FLASH_VALID_CONFIG_PRESENT  '$'
 

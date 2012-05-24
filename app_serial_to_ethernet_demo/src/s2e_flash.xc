@@ -317,7 +317,7 @@ int flash_read_config(int address, char data[])
 void flash_data_access(chanend cPersData)
 {
     char channel_data;
-    int address, page, i, rom_page, rom_length;
+    int address, page, i, rom_page, rom_length, sector_num, sector_size;
     char flash_page_data[FLASH_SIZE_PAGE];
 
     while (1)
@@ -365,6 +365,39 @@ void flash_data_access(chanend cPersData)
                     cPersData :> rom_length;
                     address = get_flash_config_address(rom_page, rom_length);
                     cPersData <: address;
+                }
+                else if (FLASH_GET_NEXT_SECTOR_ADDRESS == channel_data)
+                {
+                	unsigned sectors, num_sectors, current_sector_address;
+                	cPersData :> address;
+                	num_sectors = fl_getNumSectors();
+                    for (i = 0; i < num_sectors; i++)
+                    {
+                        current_sector_address = fl_getSectorAddress(i);
+                        if (current_sector_address >= address)
+                        {
+                            cPersData <: current_sector_address;
+                            break;
+                        }
+                    }
+                }
+                else if(FLASH_IPVER_WRITE == channel_data)
+                {
+                    cPersData :> address;
+                    for(i = 0; i < 30; i++)
+                    {
+                        cPersData :> flash_page_data[i];
+                    }
+                    write_to_flash(address, flash_page_data);
+                }
+                else if(FLASH_IPVER_READ == channel_data)
+                {
+                    cPersData :> address;
+                    read_from_flash(address, flash_page_data);
+                    for(i = 0; i < 30; i++)
+                    {
+                        cPersData <: flash_page_data[i];
+                    }
                 }
                 break;
             } // case cPersData :> channel_data :

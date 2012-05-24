@@ -33,7 +33,7 @@
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
-#define	DHCP_CONFIG	1	/* Set this to use DHCP */
+//#define	DHCP_CONFIG	1	/* Set this to use DHCP */
 #define		TWO_THREAD_ETH		1 //Enable this to use 2 thread ethernet component
 #define 	XSCOPE_EN 0     /* set this to 1 for xscope printing */
 
@@ -137,18 +137,7 @@ s_multi_uart_rx_ports uart_rx_ports = {	PORT_RX };
 /* IP Config - change this to suit your network.
  * Leave with all 0 values to use DHCP
  */
-xtcp_ipconfig_t ipconfig =
-{
-#ifndef DHCP_CONFIG
-       { 169, 254, 196, 178 }, // ip address (eg 192,168,0,2)
-       { 255, 255, 0, 0 },     // netmask (eg 255,255,255,0)
-       { 0, 0, 0, 0 }          // gateway (eg 192,168,0,1)
-#else
-       { 0, 0, 0, 0 }, // ip address (eg 192,168,0,2)
-       { 0, 0, 0, 0 }, // netmask (eg 255,255,255,0)
-       { 0, 0, 0, 0 }  // gateway (eg 192,168,0,1)
-#endif
-};
+xtcp_ipconfig_t ipconfig;
 
 /*---------------------------------------------------------------------------
  static variables
@@ -258,8 +247,16 @@ int main(void)
 #else //TWO_THREAD_ETH
         on stdcore[0]:
         {
-            char mac_address[6];
+            char mac_address[6],i;
+
             ethernet_getmac_otp(otp_ports, mac_address);
+
+            for(i = 0;i<4; i++)
+            {
+            	xtcp[0] :> ipconfig.ipaddr[i];
+            	xtcp[0] :> ipconfig.netmask[i];
+            	xtcp[0] :> ipconfig.gateway[i];
+            }
             // Start server
             uipSingleServer(clk_smi, null, smi, mii, xtcp, 1, ipconfig, mac_address);
         }

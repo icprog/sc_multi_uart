@@ -28,6 +28,7 @@
 #include "common.h"
 #include "client_request.h"
 #include <stdlib.h>
+#include "flash_ip_version_data.h"
 
 #define ENABLE_XSCOPE 0
 
@@ -740,7 +741,7 @@ static void form_and_send_udp_response(chanend tcp_svr)
 	    g_ProcessBroadcastData = 0;
 }
 
-static void process_udp_query(chanend tcp_svr)
+static void process_udp_query(chanend tcp_svr, chanend cPersData, unsigned flash_address)
 {
 	int i=0;
 	int j = 0;
@@ -842,12 +843,15 @@ static void process_udp_query(chanend tcp_svr)
 	{
 		for (k=0;k<4;k++)
 		{
-			g_ipconfig.ipaddr[k] = ipconfig_to_flash.ipaddr[k];
+			ipconfig_to_flash.gateway[k] = g_ipconfig.gateway[k];
+			ipconfig_to_flash.netmask[k] = g_ipconfig.netmask[k];
+
 		}
-#if 1
+#if 0
 		printstrln("IP Change - Resending New IP");
 		g_ProcessBroadcastData = 1;
 #else
+		flash_write_ip_data(cPersData,ipconfig_to_flash,flash_address);
 		/* Soft reset the application */
 		{
 			printstrln("Resetting the application");
@@ -881,11 +885,13 @@ void web_server_handle_event(
                 xtcp_connection_t &conn,
                 streaming chanend cWbSvr2AppMgr)
 #else //FLASH_THREAD
-void web_server_handle_event(chanend tcp_svr,
-                             xtcp_connection_t &conn,
-                             streaming chanend cWbSvr2AppMgr,
-                             chanend cAppMgr2WbSvr,
-                             chanend cPersData)
+void web_server_handle_event(
+		chanend tcp_svr,
+		xtcp_connection_t &conn,
+		streaming chanend cWbSvr2AppMgr,
+		chanend cAppMgr2WbSvr,
+		chanend cPersData,
+		unsigned flash_address)
 #endif //FLASH_THREAD
 {
     AppPorts app_port_type = TYPE_UNSUPP_PORT;
@@ -1036,7 +1042,7 @@ void web_server_handle_event(chanend tcp_svr,
             }
 			else if (app_port_type==TYPE_UDP_PORT)
 			{
-				process_udp_query(tcp_svr);
+				process_udp_query(tcp_svr, cPersData, flash_address);
 			}
             break;
             case XTCP_SENT_DATA:
@@ -1241,10 +1247,22 @@ void web_server(chanend tcp_svr,
     int WbSvr2AppMgr_uart_data;
     unsigned int AppMgr2WbSvr_uart_data;
     unsigned char tok;
+    unsigned address;
+    xtcp_ipconfig_t ipconfig;
 #if ENABLE_XSCOPE == 1
     xscope_register(0, 0, "", 0, "");
     xscope_config_io(XSCOPE_IO_BASIC);
 #endif
+    address = get_flash_address(cPersData);
+
+    ipconfig = flash_read_ip_data(cPersData, address);
+
+    for( i = 0 ; i < 4; i++ )
+    {
+	    tcp_svr <: ipconfig.ipaddr[i];
+	    tcp_svr <: ipconfig.netmask[i];
+	    tcp_svr <: ipconfig.gateway[i];
+    }
     /* Initiate HTTP and telnet connection state management */
     httpd_init(tcp_svr);
     telnetd_init_conn(tcp_svr);
@@ -1332,7 +1350,7 @@ void web_server(chanend tcp_svr,
             break;
 #else //FLASH_THREAD
             case xtcp_event(tcp_svr, conn):
-            web_server_handle_event(tcp_svr, conn, cWbSvr2AppMgr, cAppMgr2WbSvr, cPersData);
+            web_server_handle_event(tcp_svr, conn, cWbSvr2AppMgr, cAppMgr2WbSvr, cPersData, address);
             break;
             case processUserDataTimer when timerafter (processUserDataTS) :> char _ :
 			if ((1 == g_ProcessBroadcastData) &&
