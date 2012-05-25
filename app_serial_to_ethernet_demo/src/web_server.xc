@@ -31,6 +31,8 @@
 #include "flash_ip_version_data.h"
 
 #define ENABLE_XSCOPE 0
+//#define	XTCP_CLIENT_BUF_SIZE_APP	XTCP_CLIENT_BUF_SIZE
+#define	XTCP_CLIENT_BUF_SIZE_APP	128 //Temp
 
 #if ENABLE_XSCOPE == 1
 #include <print.h>
@@ -86,7 +88,7 @@ typedef struct STRUCT_XTCP_RECD_DATA_BUFFERS
     int write_index; //Input data to Tx api
     int telnet_recd_data_index; //TODO: TBR
     unsigned buf_depth; //depth of buffer to be consumed
-    char telnet_recd_data[XTCP_CLIENT_BUF_SIZE * 2];
+    char telnet_recd_data[XTCP_CLIENT_BUF_SIZE_APP * 2];
     e_bool is_currently_serviced;
 }s_xtcp_recd_data_fifo;
 
@@ -125,8 +127,8 @@ int gPollForSendingUartDataToUartTx; //0 Initially reset this
 int gPollForTelnetCommandData; //0 Initially reset this
 
 int g_UartTxNumToSend;
-char g_telnet_recd_data_buffer[XTCP_CLIENT_BUF_SIZE];
-char g_telnet_actual_data_buffer[XTCP_CLIENT_BUF_SIZE];
+char g_telnet_recd_data_buffer[XTCP_CLIENT_BUF_SIZE_APP];
+char g_telnet_actual_data_buffer[XTCP_CLIENT_BUF_SIZE_APP];
 /* Broadcast Discovery Feature related declarations */
 xtcp_connection_t g_BroadcastServerConn;
 xtcp_connection_t g_BroadcastResponseConn;
@@ -167,6 +169,7 @@ void chip_reset(void)
  *  \return		1 		on success
  *
  **/
+#pragma unsafe arrays
 static int valid_telnet_port(unsigned int port_num)
 {
     int i;
@@ -189,6 +192,7 @@ static int valid_telnet_port(unsigned int port_num)
  *  \return	None
  *
  **/
+#pragma unsafe arrays
 static int fetch_conn_id_for_uart_id(int uart_id)
 {
     int i = 0;
@@ -212,6 +216,7 @@ static int fetch_conn_id_for_uart_id(int uart_id)
  *  \return	None
  *
  **/
+#pragma unsafe arrays
 static int fetch_uart_id_for_port_id(int local_port)
 {
     int i;
@@ -238,6 +243,7 @@ static int fetch_uart_id_for_port_id(int local_port)
  *  \return			None
  *
  **/
+#pragma unsafe arrays
 void update_user_conn_details(xtcp_connection_t &conn)
 {
     int i;
@@ -277,6 +283,7 @@ void update_user_conn_details(xtcp_connection_t &conn)
  *  \return			None
  *
  **/
+#pragma unsafe arrays
 void free_user_conn_details(xtcp_connection_t &conn)
 {
     int i;
@@ -315,6 +322,7 @@ void free_user_conn_details(xtcp_connection_t &conn)
  *  \return			None
  *
  **/
+#pragma unsafe arrays
 void fetch_user_data(xtcp_connection_t &conn, char data)
 {
     int write_index = 0;
@@ -336,6 +344,7 @@ void fetch_user_data(xtcp_connection_t &conn, char data)
     }
 }
 
+#pragma unsafe arrays
 static void app_buffers_init(void)
 {
     int i;
@@ -385,6 +394,7 @@ static void app_buffers_init(void)
  *  \return			None
  *
  **/
+#pragma unsafe arrays
 static void modify_telnet_port(chanend tcp_svr, streaming chanend cWbSvr2AppMgr)
 {
     int uart_id = 0;
@@ -422,6 +432,7 @@ static void modify_telnet_port(chanend tcp_svr, streaming chanend cWbSvr2AppMgr)
  *  \return	None
  *
  **/
+#pragma unsafe arrays
 static void fetch_uart_data_and_send_to_client(chanend tcp_svr,
                                                xtcp_connection_t &conn,
                                                chanend cAppMgr2WbSvr)
@@ -572,6 +583,7 @@ static void process_user_data(streaming chanend cWbSvr2AppMgr,
 }
 
 
+#pragma unsafe arrays
 static void form_and_send_udp_response(chanend tcp_svr)
 {
 	  int i = 0;
@@ -741,6 +753,7 @@ static void form_and_send_udp_response(chanend tcp_svr)
 	    g_ProcessBroadcastData = 0;
 }
 
+#pragma unsafe arrays
 static void process_udp_query(chanend tcp_svr, chanend cPersData, unsigned flash_address)
 {
 	int i=0;
@@ -854,7 +867,7 @@ static void process_udp_query(chanend tcp_svr, chanend cPersData, unsigned flash
 		flash_write_ip_data(cPersData,ipconfig_to_flash,flash_address);
 		/* Soft reset the application */
 		{
-			printstrln("Resetting the application");
+//			printstrln("Resetting the application");
 			chip_reset();
 		}
 #endif
@@ -989,7 +1002,7 @@ void web_server_handle_event(
 
                     TempLen = telnetd_recv_data(tcp_svr, conn, g_telnet_recd_data_buffer[0], g_telnet_actual_data_buffer[0]);
 #if ENABLE_XSCOPE == 1
-                    if(xtcp_recd_data_buffer[uart_id].buf_depth >= ((XTCP_CLIENT_BUF_SIZE * 2) - 1))
+                    if(xtcp_recd_data_buffer[uart_id].buf_depth >= ((XTCP_CLIENT_BUF_SIZE_APP * 2) - 1))
                     {
                         printint(uart_id); printstrln(" ***Losing Data***");
                         printint(uart_id); printstr(" Buffer Depth = "); printintln(xtcp_recd_data_buffer[uart_id].buf_depth);
@@ -1018,7 +1031,7 @@ void web_server_handle_event(
                      * the write / read pointers are beyond what will be
                      * over-written in the buffer. */
 
-                    if (xtcp_recd_data_buffer[uart_id].buf_depth + TempLen >= XTCP_CLIENT_BUF_SIZE/2)
+                    if (xtcp_recd_data_buffer[uart_id].buf_depth + TempLen >= XTCP_CLIENT_BUF_SIZE_APP/2)
                     {
 #if ENABLE_XSCOPE == 1
                         //printint(uart_id); printstrln(" !!!Pause!!!");
@@ -1032,7 +1045,7 @@ void web_server_handle_event(
                     {
                         xtcp_recd_data_buffer[uart_id].telnet_recd_data[xtcp_recd_data_buffer[uart_id].write_index] = g_telnet_actual_data_buffer[i];
                         xtcp_recd_data_buffer[uart_id].write_index++;
-                        if (xtcp_recd_data_buffer[uart_id].write_index >= (XTCP_CLIENT_BUF_SIZE * 2))
+                        if (xtcp_recd_data_buffer[uart_id].write_index >= (XTCP_CLIENT_BUF_SIZE_APP * 2))
                         {
                             xtcp_recd_data_buffer[uart_id].write_index = 0;
                         }
@@ -1115,6 +1128,7 @@ void web_server_handle_event(
     return;
 }
 
+#pragma unsafe arrays
 static void send_uart_tx_data(chanend tcp_svr, chanend cAppMgr2WbSvr)
 {
     int buf_depth_avialable = 0;
@@ -1134,7 +1148,7 @@ static void send_uart_tx_data(chanend tcp_svr, chanend cAppMgr2WbSvr)
         /* Send Uart X data to MUART TX */
         cAppMgr2WbSvr <: xtcp_recd_data_buffer[g_UartTxNumToSend].telnet_recd_data[xtcp_recd_data_buffer[g_UartTxNumToSend].read_index];
         xtcp_recd_data_buffer[g_UartTxNumToSend].read_index++;
-        if (xtcp_recd_data_buffer[g_UartTxNumToSend].read_index >= XTCP_CLIENT_BUF_SIZE * 2)
+        if (xtcp_recd_data_buffer[g_UartTxNumToSend].read_index >= XTCP_CLIENT_BUF_SIZE_APP * 2)
         {
             xtcp_recd_data_buffer[g_UartTxNumToSend].read_index = 0;
         }
