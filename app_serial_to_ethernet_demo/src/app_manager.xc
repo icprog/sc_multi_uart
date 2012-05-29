@@ -176,6 +176,35 @@ static void init_uart_channel_state(void)
     } //for (i=0;i<UART_TX_CHAN_COUNT;i++)
 }
 
+/** =========================================================================
+ *  check_baud_rate
+ *
+ *  \param  baud_rate baud rate to check
+ *  \return 0         baud_rate ok
+ *  \return -1        invalid baud rate
+ *
+ **/
+static int check_baud_rate(int baud_rate)
+{
+    int i;
+    int default_baud_rates[14] =
+    {
+     150, 300, 600, 1200, 2400, 4800, 7200, 9600, 14400, 19200, 28800, 38400,
+     57600, 115200
+    };
+
+    if((baud_rate < 150) || (baud_rate > UART_TX_MAX_BAUD_RATE)) { return -1; }
+
+    for(i = 0; i < 14; i++)
+    {
+        if(baud_rate == default_baud_rates[i])
+        {
+            return 0;
+        }
+    }
+    return -1;
+}
+
 static void send_string_over_channel(char response[], int length, streaming chanend cWbSvr2AppMgr)
 {
     int i;
@@ -246,7 +275,7 @@ static int validate_uart_params(int ui_command[], streaming chanend cWbSvr2AppMg
             }
             case 4:
             {
-                if ((ui_command[4] < 150) || (ui_command[4] > UART_TX_MAX_BAUD_RATE))
+                if (check_baud_rate(ui_command[4]) != 0)
                 {
                     send_string_over_channel("Invalid Baud Rate value", 24, cWbSvr2AppMgr);
                     retVal = 0;
@@ -264,7 +293,7 @@ static int validate_uart_params(int ui_command[], streaming chanend cWbSvr2AppMg
             }
             case 6:
             {
-                if ((ui_command[6] < 10) || (ui_command[6] > 65000))
+                if ((ui_command[6] < 10) || (ui_command[6] > 65000) || (ui_command[6] == TELNET_PORT_USER_CMDS))
                 {
                     send_string_over_channel("Invalid Telnet Port", 20, cWbSvr2AppMgr);
                     retVal = 0;
@@ -457,7 +486,7 @@ static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr
      timeout and then send anything left in the fifo
      */
     tmr :> now;
-    if timeafter(now, uart_rx_channel_state[channel_id].last_added_timestamp + RX_CHANNEL_FLUSH_TIMEOUT)
+    if (timeafter(now, uart_rx_channel_state[channel_id].last_added_timestamp + RX_CHANNEL_FLUSH_TIMEOUT))
     {
         min_buf_level = 0;
     }
