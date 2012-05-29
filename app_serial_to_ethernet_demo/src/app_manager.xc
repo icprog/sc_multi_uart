@@ -268,7 +268,7 @@ static int validate_uart_params(int ui_command[], streaming chanend cWbSvr2AppMg
             {
                 if ((ui_command[3] < 0) || (ui_command[3] > 1))
                 {
-                    send_string_over_channel("Invalid Stop Bit value", 28, cWbSvr2AppMgr);
+                    send_string_over_channel("Invalid Stop Bit value", 23, cWbSvr2AppMgr);
                     retVal = 0;
                 }
                 break;
