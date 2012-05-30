@@ -23,29 +23,17 @@
 #include <string.h>
 #include <xs1.h>
 #include "app_manager.h"
-#include "debug.h"
 #include "common.h"
-
-#define ENABLE_XSCOPE 0
-
-#if ENABLE_XSCOPE == 1
-#include <print.h>
-#include <xscope.h>
-#endif
 
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
 #define	MAX_BIT_RATE					115200      //100000    //bits per sec
 #define TIMER_FREQUENCY					100000000	//100 Mhz
+#define	DEF_CHAR_LEN					8           // Default bits in Uart char
+#define MGR_TX_TMR_EVENT_INTERVAL       4000
+//#define MGR_TX_TMR_EVENT_INTERVAL		( TIMER_FREQUENCY / (MAX_BIT_RATE * UART_TX_CHAN_COUNT) )
 
-/* Default length of a uart character in bits */
-#define	DEF_CHAR_LEN					8
-
-//#define MGR_TX_TMR_EVENT_INTERVAL		(TIMER_FREQUENCY /	\
-//										(MAX_BIT_RATE * UART_TX_CHAN_COUNT))
-
-#define MGR_TX_TMR_EVENT_INTERVAL		4000 //500
 /*---------------------------------------------------------------------------
  ports and clocks
  ---------------------------------------------------------------------------*/
@@ -78,11 +66,9 @@ s_pending_cmd_to_send pending_cmd_to_send;
 
 /** =========================================================================
  *  uart_channel_init
- *
  *  Initialize Uart channels data structure
  *
  *  \param		None
- *
  *  \return		None
  *
  **/
@@ -129,11 +115,9 @@ static void uart_channel_init(void)
 
 /** =========================================================================
  *  init_uart_channel_state
- *
  *  Initialize Uart channels state to default values
  *
  *  \param			None
- *
  *  \return			None
  *
  **/
@@ -217,7 +201,6 @@ static void send_string_over_channel(char response[], int length, streaming chan
  *  Validates UART X parameters before applying them to UART
  *
  *  \param unsigned int	Uart channel identifier
- *
  *  \return		0 		on success
  *
  **/
@@ -324,7 +307,6 @@ static int validate_uart_params(int ui_command[], streaming chanend cWbSvr2AppMg
  *  invokes MUART component api's to initialze MUART Tx and Rx threads
  *
  *  \param unsigned int	Uart channel identifier
- *
  *  \return		0 		on success
  *
  **/
@@ -353,9 +335,7 @@ static int configure_uart_channel(unsigned int channel_id)
  *  MULTI_UART_GO signal from MUART_RX and MUART_RX threads
  *
  *  \param	chanend cTxUART		channel end sharing channel to MUART TX thrd
- *
  *  \param	chanend cRxUART		channel end sharing channel to MUART RX thrd
- *
  *  \return			None
  *
  **/
@@ -370,18 +350,7 @@ static void apply_default_uart_cfg_and_wait_for_muart_tx_rx_threads(streaming ch
         chnl_config_status = configure_uart_channel(channel_id);
         if(0 != chnl_config_status)
         {
-#ifdef DEBUG_LEVEL_3
-            printstr("Uart configuration failed for channel: ");
-            printintln(channel_id);
-#endif //DEBUG_LEVEL_3
             chnl_config_status = 0;
-        }
-        else
-        {
-#ifdef DEBUG_LEVEL_3
-            printstr("Successful Uart configuration for channel: ");
-            printintln(channel_id);
-#endif //DEBUG_LEVEL_3
         }
     } // for(channel_id = 0; channel_id < UART_TX_CHAN_COUNT; channel_id++)
     /* Release UART rx thread */
@@ -398,9 +367,7 @@ static void apply_default_uart_cfg_and_wait_for_muart_tx_rx_threads(streaming ch
  *  and save the data into application managed RX buffer
  *
  *  \param chanend cUART : channel end of data channel from MUART RX thread
- *
  *  \param unsigned channel_id : uart channel identifir
- *
  *  \return			None
  *
  **/
@@ -428,32 +395,20 @@ void uart_rx_receive_uart_channel_data( streaming chanend cUART, unsigned channe
             uart_rx_channel_state[channel_id].buf_depth++;
             tmr :> uart_rx_channel_state[channel_id].last_added_timestamp;
         }
-#if ENABLE_XSCOPE == 1
-        else
-        {
-            printstr("App uart RX buffer full. Missed char for chnl id: ");
-            printintln(channel_id);
-        }
-#endif	//DEBUG_LEVEL_2
     } // if(uart_rx_validate_char(channel_id, uart_char) == 0)
 }
 
 /** =========================================================================
  *  get_uart_channel_data
- *
  *  This function waits for channel data from MUART RX thread;
  *  when uart channel data is available, decodes uart char to raw character
  *  and save the data into application managed RX buffer
  *
  *  \param int channel_id : reference to uart channel identifir
- *
  *  \param int conn_id 	 : reference to client connection identifir
- *
  *  \param int read_index : reference to current buffer position to read
  *  							channel data
- *
  *  \param int buf_depth : reference to current depth of uart channel buffer
- *
  *  \return			1	when there is data to send
  *  					0	otherwise
  *
@@ -495,7 +450,6 @@ static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr
         min_buf_level = RX_CHANNEL_MIN_PACKET_LEN;
     }
 
-    //printint(buf_depth); TODO: Bug: Data for chnl 7 is always present
     if ((uart_rx_channel_state[channel_id].buf_depth > min_buf_level) && (uart_rx_channel_state[channel_id].buf_depth <= RX_CHANNEL_FIFO_LEN))
     {
         /* Send Uart Id and buffer depth */
@@ -508,11 +462,9 @@ static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr
 
 /** =========================================================================
  *  collect_uart_tx_data
- *
  *  This function collects xtcp telnet data into application buffer
  *
  *  \param chanend cAppMgr2WbSvr : Channel to exchange telnet data
- *
  *  \return			None
  *
  **/
@@ -540,20 +492,15 @@ static void collect_uart_tx_data(chanend cAppMgr2WbSvr)
 
 /** =========================================================================
  *  uart_rx_send_uart_channel_data
- *
  *  This function waits for channel data from MUART RX thread;
  *  when uart channel data is available, decodes uart char to raw character
  *  and save the data into application managed RX buffer
  *
  *  \param int channel_id : reference to uart channel identifir
- *
  *  \param int conn_id 	 : reference to client connection identifir
- *
  *  \param int read_index : reference to current buffer position to read
  *  							channel data
- *
  *  \param int buf_depth : reference to current depth of uart channel buffer
- *
  *  \return			1	when there is data to send
  *  					0	otherwise
  *
@@ -593,14 +540,12 @@ static void uart_rx_send_uart_channel_data(chanend cAppMgr2WbSvr)
 
 /** =========================================================================
  *  uart_tx_fill_uart_channel_data_from_queue
- *
  *  This function primarily handles UART TX buffer overflow condition by
  *  storing data into its application buffer when UART Tx buffer is full
  *  This function reads data from uart channel specific application TX buffer
  *  and invokes MUART TX api to send to uart channel of MUART TX component
  *
  *  \param 			None
- *
  *  \return			None
  *
  **/
@@ -642,15 +587,11 @@ void uart_tx_fill_uart_channel_data_from_queue()
 
 /** =========================================================================
  *  re_apply_uart_channel_config
- *
  *  This function either configures or reconfigures a uart channel
  *
  *  \param	s_uart_channel_config sUartChannelConfig Reference to UART conf
- *
  *  \param	chanend cTxUART		channel end sharing channel to MUART TX thrd
- *
  *  \param	chanend cRxUART		channel end sharing channel to MUART RX thrd
- *
  *  \return			None
  *
  **/
@@ -668,23 +609,13 @@ static int re_apply_uart_channel_config(int channel_id,
     chnl_config_status = configure_uart_channel(channel_id);
     uart_tx_reconf_enable(cTxUART);
     uart_rx_reconf_enable(cRxUART);
-    /*
-    if(0 != chnl_config_status)
-    {
-        printint(channel_id);
-        printstrln(": Channel reconfig failed");
-    }
-    */
-    //TODO: Send response back on the channel
 }
 
 /** =========================================================================
  *  parse_uart_command_data
- *
  *  This function parses UI command data to identify different UART params
  *
  *  \param	chanend cWbSvr2AppMgr channel end sharing web server thread
- *
  *  \return			None
  *
  **/
@@ -850,11 +781,6 @@ void app_manager_handle_uart_data( streaming chanend cWbSvr2AppMgr,
     char flash_data;
     unsigned char tok;
     int write_index;
-
-#if ENABLE_XSCOPE == 1
-    xscope_register(0, 0, "", 0, "");
-    xscope_config_io(XSCOPE_IO_BASIC);
-#endif
 
     //TODO: Flash cold start should happen here
     /* Applying default in-program values, in case Cold start fails */

@@ -4,7 +4,6 @@
 // LICENSE.txt and at <http://github.xcore.com/>
 
 #include <string.h>
-#include <print.h>
 #include "xtcp_client.h"
 #include "xtcp_buffered_client.h"
 #include "telnetd.h"

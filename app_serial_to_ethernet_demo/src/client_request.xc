@@ -25,7 +25,7 @@ Purpose
  where,
  ~ => MARKER_START
  1 => GET command
- 0 => channle number
+ 0 => channel number
  @ => MARKER_END
 
  For SET, the command is '2' and should be followed by the settings and
@@ -42,14 +42,11 @@ include files
 #include "client_request.h"
 #include "s2e_flash.h"
 #include "common.h"
-#include "debug.h"
 #include <string.h>
-//#include <print.h>
 
 /*---------------------------------------------------------------------------
 constants
 ---------------------------------------------------------------------------*/
-//#define CR_DEBUG 1
 
 /*---------------------------------------------------------------------------
 ports and clocks
@@ -84,11 +81,6 @@ static void clear_char_array(char c[], int length);
 
 static void replace_with_zero(char rwz_c[], int rwz_start, int rwz_end);
 
-#ifndef FLASH_THREAD
-static int get_flash_config_address();
-#else //FLASH_THREAD
-static int get_flash_config_address(chanend cPersData);
-#endif //FLASH_THREAD
 static void create_get_command(char cc_data[], int cc_channel);
 
 static void create_set_command(char cc_data[], int cc_channel, int index);
@@ -146,49 +138,43 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
 
     switch(command)
     {
+        /* ====================================
+         * GET
+         * ==================================== */
         case CMD_CONFIG_GET:
         {
-#ifdef CR_DEBUG
-            printstrln("CR: GET request");
-#endif
             // exchange data with am
             exchange_data_with_am(cWbSvr2AppMgr, data, response, ix_start, ix_end);
-#ifdef CR_DEBUG
-            printstrln("CR: GET request completed");
-#endif
             break;
         } // case CMD_CONFIG_GET:
 
+        /* ====================================
+         * SET
+         * ==================================== */
         case CMD_CONFIG_SET:
         {
-#ifdef CR_DEBUG
-            printstrln("CR: SET request");
-#endif
             // exchange data with am
             exchange_data_with_am(cWbSvr2AppMgr, data, response, ix_start, ix_end);
             /* Send SET command complete */
             cWbSvr2AppMgr <: UART_SET_END_FROM_APP_TO_UART;
-#ifdef CR_DEBUG
-            printstrln("CR: SET request completed");
-#endif
             break;
         } // case CMD_CONFIG_SET:
 
+        /* ====================================
+         * SAVE
+         * ==================================== */
         case CMD_CONFIG_SAVE:
         {
-#ifdef CR_DEBUG
-            printstrln("CR: SAVE request");
-#endif
             // get flash config address
 #ifndef FLASH_THREAD
-            config_address = get_flash_config_address();
+            config_address = get_flash_data_address(UART_CONFIG);
 #else //FLASH_THREAD
-            config_address = get_flash_config_address(cPersData);
+            config_address = get_data_address(UART_CONFIG, cPersData);
 #endif //FLASH_THREAD
+
             // get settings for each config from app_manager
-            // TODO: flash_data[0] must contain validity flag for settings in flash
             k = 0;
-            flash_data[k] = FLASH_VALID_CONFIG_PRESENT; k++;
+            flash_data[k] = FLASH_VALID_DATA_PRESENT; k++;
 
             for(i = 0; i < UART_APP_TX_CHAN_COUNT; i++)
             {
@@ -209,38 +195,35 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
 
             // send this data to core 0 to write to flash
 #ifndef FLASH_THREAD
-            flash_write_config(config_address, flash_data);
+            write_to_flash(config_address, flash_data);
 #else //FLASH_THREAD
-            flash_access(FLASH_CONFIG_WRITE,
+            flash_access(FLASH_DATA_WRITE,
                          flash_data,
                          config_address,
                          cPersData);
 #endif //FLASH_THREAD
-#ifdef CR_DEBUG
-            printstrln("CR: completed SAVE");
-#endif
 
             break;
         } // case CMD_CONFIG_SAVE:
 
+        /* ====================================
+         * RESTORE
+         * ==================================== */
         case CMD_CONFIG_RESTORE:
         {
-#ifdef CR_DEBUG
-            printstrln("CR: RESTORE request");
-#endif
             // get flash config address
 #ifndef FLASH_THREAD
-            config_address = get_flash_config_address();
+            config_address = get_flash_data_address(UART_CONFIG);
             // get the data from flash
-            flash_read_config(config_address, flash_data);
+            read_from_flash(config_address, flash_data);
 #else //FLASH_THREAD
-            config_address = get_flash_config_address(cPersData);
-
+            config_address = get_data_address(UART_CONFIG, cPersData);
             // get the data from flash
-            flash_access(FLASH_CONFIG_READ, flash_data, config_address, cPersData);
+            flash_access(FLASH_DATA_READ, flash_data, config_address, cPersData);
 #endif //FLASH_THREAD
+
             // check for configuration present in flash
-            if(flash_data[0] != FLASH_VALID_CONFIG_PRESENT)
+            if(flash_data[0] != FLASH_VALID_DATA_PRESENT)
             {
                 response[0] = MARKER_END;
             }
@@ -258,23 +241,15 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
                     exchange_data_with_am(cWbSvr2AppMgr, flash_data, response, temp_start, temp_end);
                     // replace previous data with zero to avoid marker find above
                     replace_with_zero(flash_data, 0, temp_end);
-                }
-            }
+                } // for(i = 0; i < UART_APP_TX_CHAN_COUNT; i++)
+            } // else
 
             /* Send signal as Restore command complete */
             cWbSvr2AppMgr <: UART_RESTORE_END_FROM_APP_TO_UART;
-#ifdef CR_DEBUG
-            printstrln("CR: completed RESTORE");
-#endif
             break;
         } // case CMD_CONFIG_RESTORE:
 
-        default:
-        {
-            // should not get here
-            // if we do get here, send error response - user entered wrong command
-            return 0; break;
-        } // default
+        default: { return 0; break; }
 
     } // switch(command)
 
@@ -344,27 +319,13 @@ static void get_response_data(streaming chanend cWbSvr2AppMgr,
 {
     int done = 0;
     int i = 0;
-#ifdef CR_DEBUG
-    printstr("CR: Response from am: ");
-#endif
     do
     {
         cWbSvr2AppMgr :> grd_response[i];
-#ifdef CR_DEBUG
-            printchar(grd_response[i]);
-#endif
-        if(grd_response[i] == MARKER_END)
-        {
-            done = 1;
-        }
-        else
-        {
-            i++;
-        }
+        if(grd_response[i] == MARKER_END) { done = 1; }
+        else { i++; }
+
     } while(done == 0);
-#ifdef CR_DEBUG
-    printstrln("");
-#endif
 }
 
 /** =========================================================================
@@ -383,19 +344,10 @@ static void send_to_channel(streaming chanend cWbSvr2AppMgr,
 {
     int i;
 	cWbSvr2AppMgr <: UART_CMD_FROM_APP_TO_UART;
-#ifdef CR_DEBUG
-    printstr("CR: Sending  to   am: ");
-#endif
     for(i = stc_start; i <= stc_end; i++)
     {
         cWbSvr2AppMgr <: stc_data[i];
-#ifdef CR_DEBUG
-        printchar(stc_data[i]);
-#endif
     }
-#ifdef CR_DEBUG
-    printstrln("");
-#endif
 }
 
 /** =========================================================================
@@ -429,43 +381,6 @@ static void replace_with_zero(char rwz_c[], int rwz_start, int rwz_end)
     {
         rwz_c[i] = '0';
     }
-}
-
-/** =========================================================================
- *  get_flash_config_address
- *
- *  \param chanend cPersData channel for flash access
- *
- **/
-#pragma unsafe arrays
-#ifndef FLASH_THREAD
-static int get_flash_config_address()
-#else //FLASH_THREAD
-static int get_flash_config_address(chanend cPersData)
-#endif //FLASH_THREAD
-{
-    int flash_index_page_config, flash_length_config;
-    int config_address = 0;
-
-    // get the location of last file
-    flash_index_page_config = fsdata[WPAGE_NUM_FILES - 1].page;
-    flash_length_config = fsdata[WPAGE_NUM_FILES - 1].length;
-
-    // get the config address. config data will be stored in a new sector above the fs file system
-    // this way the sector can be erased an re-written on 'save' request
-#ifndef FLASH_THREAD
-    config_address = flash_get_config_address(flash_index_page_config,
-                                              flash_length_config);
-#else //FLASH_THREAD
-    config_address = get_config_address(flash_index_page_config,
-                                        flash_length_config,
-                                        cPersData);
-#endif //FLASH_THREAD
-#ifdef CR_DEBUG
-    printstr("CR: Config Address: "); printintln(config_address);
-#endif
-
-    return config_address;
 }
 
 /** =========================================================================

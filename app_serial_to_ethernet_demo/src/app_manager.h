@@ -24,11 +24,13 @@ include files
 #include "multi_uart_rx.h"
 #include "multi_uart_common.h"
 #include "common.h"
+
 /*---------------------------------------------------------------------------
 constants
 ---------------------------------------------------------------------------*/
 #define	ERR_UART_CHANNEL_NOT_FOUND	50
 #define	ERR_CHANNEL_CONFIG			60
+
 /*---------------------------------------------------------------------------
 typedefs
 ---------------------------------------------------------------------------*/
@@ -87,8 +89,11 @@ prototypes
 ---------------------------------------------------------------------------*/
 /** 
  *  The multi uart manager thread. This thread
- *  (i) periodically polls for data on application Tx buffer, in order to transmit to telnet clients
+ *  (i) periodically polls for data on application Tx buffer, in order to
+ *  transmit to telnet clients
  *  (ii) waits for channel data from MUART Rx thread
+ *
+ *  TODO: Chk for real necessity of a streaming chnl
  *
  *  \param	chanend cWbSvr2AppMgr channel end sharing web server thread
  *  \param	chanend cTxUART		channel end sharing channel to MUART TX thrd
@@ -97,14 +102,12 @@ prototypes
  *
  */
 
-void app_manager_handle_uart_data(
-		streaming chanend cWbSvr2AppMgr,//TODO: Chk for real necessity of a streaming chnl
+void app_manager_handle_uart_data(streaming chanend cWbSvr2AppMgr,
 		chanend cAppMgr2WbSvr,
 		streaming chanend cTxUART,
 		streaming chanend cRxUART);
 
-void update_uart_rx_channel_state(
-		REFERENCE_PARAM(int, channel_id),
+void update_uart_rx_channel_state(REFERENCE_PARAM(int, channel_id),
 		REFERENCE_PARAM(int, read_index),
 		REFERENCE_PARAM(unsigned int, buf_depth));
 

@@ -21,7 +21,6 @@
 #include <string.h>
 #include "httpd.h"
 #include "common.h"
-#include "debug.h"
 #include "s2e_flash.h"
 #include "client_request.h"
 

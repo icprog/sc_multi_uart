@@ -29,13 +29,18 @@ constants
 
 // flash_operation defines
 #define FLASH_ROM_READ              '@'
-#define FLASH_CONFIG_WRITE          '~'
-#define FLASH_CONFIG_READ           '!'
-#define FLASH_GET_CONFIG_ADDRESS    '#'
+#define FLASH_DATA_WRITE            '~'
+#define FLASH_DATA_READ             '!'
+#define FLASH_GET_DATA_ADDRESS      '#'
 
-// indicate if there is a config present in flash
-#define FLASH_VALID_CONFIG_PRESENT  '$'
+// indicate if there is data present in flash
+#define FLASH_VALID_DATA_PRESENT    '$'
 
+// Index sectors where the data is present
+#define UART_CONFIG                 0
+#define IPVER                       1
+
+// Flash error or ok
 #define S2E_FLASH_ERROR             -1
 #define S2E_FLASH_OK                0
 
@@ -66,24 +71,21 @@ static variables
 prototypes
 ---------------------------------------------------------------------------*/
 #ifndef FLASH_THREAD
-int flash_get_config_address(int last_rom_page, int last_rom_length);
 
+int read_from_flash(int address, char data[]);
+int write_to_flash(int address, char data[]);
 int flash_read_rom(int page, char data[]);
+int get_flash_data_address(int data_type);
 
-int flash_write_config(int address, char data[]);
-
-int flash_read_config(int address, char data[]);
 #else //FLASH_THREAD
-void flash_data_access(chanend cPersData);
 
+int get_data_address(int data_type, chanend cPersData);
+void flash_data_access(chanend cPersData);
 int flash_access(char flash_operation,
                  char data[],
                  int address,
                  chanend cPersData);
 
-int get_config_address(int last_rom_page,
-                       int last_rom_length,
-                       chanend cPersData);
 #endif //FLASH_THREAD
 
 #endif /* S2E_FLASH_H_ */

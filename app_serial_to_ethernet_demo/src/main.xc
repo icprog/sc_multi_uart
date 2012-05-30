@@ -33,8 +33,8 @@
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
-//#define	DHCP_CONFIG	1	/* Set this to use DHCP */
-#define		TWO_THREAD_ETH		1 //Enable this to use 2 thread ethernet component
+#define DHCP_CONFIG	    1	        // Set this to use DHCP */
+#define	TWO_THREAD_ETH	1           // Enable this to use 2 thread ethernet
 
 /*---------------------------------------------------------------------------
  ports and clocks
@@ -253,8 +253,15 @@ int main(void)
 #else //TWO_THREAD_ETH
         on stdcore[0]:
         {
-            char mac_address[6];
+            char mac_address[6], i;
             ethernet_getmac_otp(otp_ports, mac_address);
+
+            for(i = 0; i < 4; i++)
+            {
+            	xtcp[0] :> ipconfig.ipaddr[i];
+            	xtcp[0] :> ipconfig.netmask[i];
+            	xtcp[0] :> ipconfig.gateway[i];
+            }
             // Start server
             uipSingleServer(clk_smi, null, smi, mii, xtcp, 1, ipconfig, mac_address);
         }

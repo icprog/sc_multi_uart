@@ -20,7 +20,6 @@ include files
 ---------------------------------------------------------------------------*/
 #include "telnetd.h"
 #include "telnet_app.h"
-#include "debug.h"
 
 /*---------------------------------------------------------------------------
 constants
@@ -75,9 +74,6 @@ void telnetd_recv_line(chanend tcp_svr,
                        //char line[],
                        int len)
 {
-#ifdef DEBUG_LEVEL_3
-	printstr("Rx telnet line. ");printstrln(line);
-#endif //DEBUG_LEVEL_3
   //telnetd_send_line(tcp_svr, id, line); //TODO: Dont echo for temp case
 }
 

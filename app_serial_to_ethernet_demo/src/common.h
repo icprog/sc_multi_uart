@@ -26,20 +26,27 @@ constants
 //Separate thread for accessing flash routines
 /* Enable this macro if Web Server is not on Core 0 */
 #define FLASH_THREAD
+
 /* Length of application buffer to hold UART channel data */
 #define UART_APP_TX_CHAN_COUNT		8 // Must be Same as UART_TX_CHAN_COUNT
 #define TX_CHANNEL_FIFO_LEN			128 //This is a common length between app server and data manager
 #define RX_CHANNEL_FIFO_LEN			256
+
 #define RX_CHANNEL_MIN_PACKET_LEN                12
 #define RX_CHANNEL_FLUSH_TIMEOUT           10000000
-#ifndef NUM_HTTPD_CONNECTIONS
+
 /* Maximum number of concurrent connections */
+#ifndef NUM_HTTPD_CONNECTIONS
 #define NUM_HTTPD_CONNECTIONS 10
 #endif //NUM_HTTPD_CONNECTIONS
+
 /* Configure web browser port number */
 #define HTTP_PORT					80
 #define TELNET_PORT_USER_CMDS		23
 #define DEF_TELNET_PORT_START_VALUE	46
+#define INCOMING_UDP_PORT			15534//15541//
+#define XTCP_UDP_RECV_BUF_SIZE		80
+#define OUTGOING_UDP_PORT 			15533//15542//
 
 /* Channel communication parameters */
 #define CMD_CONFIG_GET      '1'
