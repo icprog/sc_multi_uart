@@ -33,10 +33,19 @@
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
+#define         L1_BUILD_TEST           0 /* Enable this to put everything on one core for testing the build for an L1 Device */
+
 //#define	DHCP_CONFIG	1	/* Set this to use DHCP */
 #define		TWO_THREAD_ETH		1 /* Enable this to use 2 thread ethernet component */
 #define 	XSCOPE_EN 0     /* set this to 1 for xscope printing */
+
+#if L1_BUILD_TEST
+#define 	MUART_CORE_NUM		0 /* Core to place MUART comp and APP Manager Thread */
+#define         WEB_SERVER_CORE         0 /* Core to place the WEB server */
+#else
 #define 	MUART_CORE_NUM		1 /* Core to place MUART comp and APP Manager Thread */
+#define         WEB_SERVER_CORE         1 /* Core to place the WEB server */
+#endif
 
 #if XSCOPE_EN == 1
 #include <xscope.h>
@@ -54,14 +63,14 @@ on stdcore[0] : fl_SPIPorts flash_ports =
   PORT_SPI_SS,
   PORT_SPI_CLK,
   PORT_SPI_MOSI,
-  XS1_CLKBLK_5 //XS1_CLKBLK_3
+  XS1_CLKBLK_3
 };
 
 on stdcore[MUART_CORE_NUM]: clock uart_clock_tx = XS1_CLKBLK_4;
 /* Define 1 bit external clock */
 on stdcore[MUART_CORE_NUM]: in port uart_ref_ext_clk = XS1_PORT_1F;
 
-on stdcore[MUART_CORE_NUM]: clock uart_clock_rx = XS1_CLKBLK_3;
+on stdcore[MUART_CORE_NUM]: clock uart_clock_rx = XS1_CLKBLK_5;
 
 #ifndef TWO_THREAD_ETH
 
@@ -93,11 +102,14 @@ on stdcore[0]: mii_interface_t mii =
     on stdcore[0]: smi_interface_t smi = {PORT_ETH_MDIO, PORT_ETH_MDC, 0};
 #endif
 #else //TWO_THREAD_ETH
-#if MUART_CORE_NUM == 1
-#define PORT_ETH_FAKE on stdcore[0]: XS1_PORT_8A
-#else  //#if MUART_CORE_NUM == 1
+
+//#if L1_BUILD_TEST
+//#define PORT_ETH_FAKE    on stdcore[0]: XS1_PORT_8C
+//#else
+
+                   //#endif
+
 #define PORT_ETH_FAKE    on stdcore[0]: XS1_PORT_8C
-#endif //#if MUART_CORE_NUM == 1
 
 on stdcore[0]: struct otp_ports otp_ports =
 {
@@ -117,11 +129,18 @@ on stdcore[0]: mii_interface_t mii =
  PORT_ETH_TXCLK_1,
  PORT_ETH_TXEN_1,
  PORT_ETH_TXD_1,
- PORT_ETH_FAKE,
+ PORT_ETH_FAKE
 };
 
 //on stdcore[0]: out port p_reset = XS1_PORT_8D;
-//on stdcore[0]: clock clk_smi = XS1_CLKBLK_5;
+#if L1_BUILD_TEST
+// Currently we have not got enough clock blocks, so this is
+// initialized with an invalid clock initilizer for build testing
+on stdcore[0]: clock clk_smi = 0xBADF00D;
+#else
+on stdcore[0]: clock clk_smi = XS1_CLKBLK_5;
+#endif
+
 on stdcore[0]: smi_interface_t smi =
 {
   0,
@@ -265,8 +284,8 @@ int main(void)
             	xtcp[0] :> ipconfig.gateway[i];
             }
             // Start server
-            //uipSingleServer(clk_smi, null, smi, mii, xtcp, 1, ipconfig, mac_address);
-            uipSingleServer(null, null, smi, mii, xtcp, 1, ipconfig, mac_address);
+            uipSingleServer(clk_smi, null, smi, mii, xtcp, 1, ipconfig, mac_address);
+
         }
 #endif //TWO_THREAD_ETH
 
@@ -284,9 +303,9 @@ int main(void)
 
 	            /* web server thread for handling and servicing http requests and telnet data communication */
 #ifndef FLASH_THREAD
-	            on stdcore[1]: web_server(xtcp[0], cWbSvr2AppMgr, cAppMgr2WbSvr);
+	            on stdcore[WEB_SERVER_CORE]: web_server(xtcp[0], cWbSvr2AppMgr, cAppMgr2WbSvr);
 #else //FLASH_THREAD
-	            on stdcore[1]: web_server(xtcp[0], cWbSvr2AppMgr, cAppMgr2WbSvr, cPersData);
+	            on stdcore[WEB_SERVER_CORE]: web_server(xtcp[0], cWbSvr2AppMgr, cAppMgr2WbSvr, cPersData);
 #endif //FLASH_THREAD
 
 	            /* The multi-uart application manager thread to handle uart data communication to web server clients */
