@@ -29,10 +29,10 @@
 #include "client_request.h"
 #include <stdlib.h>
 #include "flash_ip_version_data.h"
+#include "xtcp_client_conf.h"
 
 #define ENABLE_XSCOPE 0
-//#define	XTCP_CLIENT_BUF_SIZE_APP	XTCP_CLIENT_BUF_SIZE
-#define	XTCP_CLIENT_BUF_SIZE_APP	128 //Temp
+#define	XTCP_CLIENT_BUF_SIZE_APP	UIP_CONF_RECEIVE_WINDOW
 
 #if ENABLE_XSCOPE == 1
 #include <print.h>
@@ -88,7 +88,7 @@ typedef struct STRUCT_XTCP_RECD_DATA_BUFFERS
     int write_index; //Input data to Tx api
     int telnet_recd_data_index; //TODO: TBR
     unsigned buf_depth; //depth of buffer to be consumed
-    char telnet_recd_data[XTCP_CLIENT_BUF_SIZE_APP * 2];
+    char telnet_recd_data[XTCP_CLIENT_BUF_SIZE_APP];
     e_bool is_currently_serviced;
 }s_xtcp_recd_data_fifo;
 
@@ -127,8 +127,8 @@ int gPollForSendingUartDataToUartTx; //0 Initially reset this
 int gPollForTelnetCommandData; //0 Initially reset this
 
 int g_UartTxNumToSend;
-char g_telnet_recd_data_buffer[XTCP_CLIENT_BUF_SIZE_APP];
-char g_telnet_actual_data_buffer[XTCP_CLIENT_BUF_SIZE_APP];
+char g_telnet_recd_data_buffer[UIP_CONF_RECEIVE_WINDOW];
+char g_telnet_actual_data_buffer[UIP_CONF_RECEIVE_WINDOW];
 /* Broadcast Discovery Feature related declarations */
 xtcp_connection_t g_BroadcastServerConn;
 xtcp_connection_t g_BroadcastResponseConn;
@@ -957,6 +957,8 @@ void web_server_handle_event(
             {
                 /* Initialize and manage telnet connection state and set tx buffers */
                 telnetd_init_state(tcp_svr, conn);
+                xtcp_ack_recv_mode(tcp_svr, conn);
+
                 /* Note connection details so that data is manageable at server level */
                 update_user_conn_details(conn);
             }
@@ -989,7 +991,8 @@ void web_server_handle_event(
             }
             else if (TELNET_PORT_USER_CMDS == conn.local_port)
             {
-                telnetd_recv(tcp_svr, conn);
+              //telnetd_recv(tcp_svr, conn);
+ telnetd_recv_data(tcp_svr, conn, g_telnet_recd_data_buffer[0], g_telnet_actual_data_buffer[0]);
             }
             else if (app_port_type==TYPE_TELNET_PORT)
             {
@@ -1036,9 +1039,6 @@ void web_server_handle_event(
 #if ENABLE_XSCOPE == 1
                         //printint(uart_id); printstrln(" !!!Pause!!!");
 #endif
-                        /* Pause the connection till buffer is consumed */
-                        xtcp_pause(tcp_svr, conn);
-                        /* Upon data consumption, unpause connection */
                     }
 
                     for (i=0; i<TempLen; i++)
@@ -1159,7 +1159,7 @@ static void send_uart_tx_data(chanend tcp_svr, chanend cAppMgr2WbSvr)
     {
         xtcp_connection_t conn;
         conn.id = fetch_conn_id_for_uart_id(uart_id);
-        xtcp_unpause(tcp_svr, conn);
+        xtcp_ack_recv(tcp_svr, conn);
 #if ENABLE_XSCOPE == 1
         //printint(uart_id); printstrln(" ***Unpause***");
 #endif

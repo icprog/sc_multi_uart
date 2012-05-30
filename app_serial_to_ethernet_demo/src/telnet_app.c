@@ -42,9 +42,6 @@ global variables
 static variables
 ---------------------------------------------------------------------------*/
 static int active_conn = -1;
-/* Flag to indicate whether app callback function utilizing telnet service
- * has been registered or not */
-static int register_app_callback;
 
 /*---------------------------------------------------------------------------
 implementation
@@ -106,7 +103,7 @@ void telnetd_new_connection(chanend tcp_svr, int id)
 /** =========================================================================
 *  telnetd_set_new_session
 *
-*  Listen on the telnet port and register application callback function,
+*  Listen on the telnet port
 *   in order to receive telnet data and send it to uart via app manager
 *
 *  \param	chanend tcp_svr		channel end sharing uip_server thread
@@ -122,12 +119,6 @@ void telnetd_set_new_session(chanend tcp_svr, int telnet_port)
   // Listen on the telnet port
   xtcp_listen(tcp_svr, telnet_port, XTCP_PROTOCOL_TCP);
 
-  if (0 == register_app_callback)
-  {
-	  /* Register application callback function */
-	  register_callback(&fetch_user_data);
-	  register_app_callback = 1;
-  }
 
 }
 
