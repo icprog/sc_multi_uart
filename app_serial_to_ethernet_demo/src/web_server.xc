@@ -384,15 +384,13 @@ static void modify_telnet_port(chanend tcp_svr, streaming chanend cWbSvr2AppMgr)
     cWbSvr2AppMgr :> telnet_port_num;
     if (user_port_to_uart_id_map[uart_id].local_port != telnet_port_num)
     {
-        if (user_port_to_uart_id_map[uart_id].conn_id >= 0) //Ensure a valid conn_id
-        {
-            xtcp_connection_t conn_release;
-            /* Modify telnet sockets */
-            conn_release.id = user_port_to_uart_id_map[uart_id].conn_id;
-            conn_release.local_port = user_port_to_uart_id_map[uart_id].local_port;
-            xtcp_unlisten(tcp_svr, conn_release.local_port);
-            xtcp_abort(tcp_svr, conn_release);
-        }
+        xtcp_connection_t conn_release;
+        /* Modify telnet sockets */
+        conn_release.id = user_port_to_uart_id_map[uart_id].conn_id;
+        conn_release.local_port = user_port_to_uart_id_map[uart_id].local_port;
+        xtcp_unlisten(tcp_svr, conn_release.local_port);
+        xtcp_abort(tcp_svr, conn_release);
+            
         /* Open a new telnet session */
         telnetd_set_new_session(tcp_svr, telnet_port_num);
         /* Update local port number */
