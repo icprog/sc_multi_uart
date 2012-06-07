@@ -384,7 +384,7 @@ static void modify_telnet_port(chanend tcp_svr, streaming chanend cWbSvr2AppMgr)
     cWbSvr2AppMgr :> telnet_port_num;
     if (user_port_to_uart_id_map[uart_id].local_port != telnet_port_num)
     {
-        if (user_port_to_uart_id_map[uart_id].conn_id > 0) //Ensure a valid conn_id
+        if (user_port_to_uart_id_map[uart_id].conn_id >= 0) //Ensure a valid conn_id
         {
             xtcp_connection_t conn_release;
             /* Modify telnet sockets */
