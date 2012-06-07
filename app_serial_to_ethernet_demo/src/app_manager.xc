@@ -7,7 +7,7 @@
  Filename: app_manager.xc
  Project : app_serial_to_ethernet_demo
  Author  : XMOS Ltd
- Version : 1v0
+ Version : 1v1v3
  Purpose : This file implements state machine to handle http requests and
  connection state management and functionality to interface http client
  (mainly application and uart channels configuration) data
@@ -28,10 +28,10 @@
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
-#define	MAX_BIT_RATE					115200      //100000    //bits per sec
-#define TIMER_FREQUENCY					100000000	//100 Mhz
+#define	MAX_BIT_RATE					115200      // bits per sec
 #define	DEF_CHAR_LEN					8           // Default bits in Uart char
 #define MGR_TX_TMR_EVENT_INTERVAL       4000
+//#define TIMER_FREQUENCY                   100000000   //100 Mhz
 //#define MGR_TX_TMR_EVENT_INTERVAL		( TIMER_FREQUENCY / (MAX_BIT_RATE * UART_TX_CHAN_COUNT) )
 
 /*---------------------------------------------------------------------------
@@ -43,8 +43,6 @@
  ---------------------------------------------------------------------------*/
 typedef struct STRUCT_CMD_DATA
 {
-    //	int   flag;
-    //	int   cmd_type;  //For future use
     int uart_id;
 } s_pending_cmd_to_send;
 
@@ -70,46 +68,20 @@ s_pending_cmd_to_send pending_cmd_to_send;
  *
  *  \param		None
  *  \return		None
- *
  **/
 static void uart_channel_init(void)
 {
     int i;
-#ifdef SET_VARIABLE_BAUD_RATE
-    int baud_rate = MAX_BIT_RATE;
-    int baud_rate_reset = 0;
-#endif //SET_VARIABLE_BAUD_RATE
     for(i = 0; i < UART_TX_CHAN_COUNT; i++)
     {
         // Initialize Uart channels configuration data structure
         uart_channel_config[i].channel_id = i;
         uart_channel_config[i].parity = even;
         uart_channel_config[i].stop_bits = sb_1;
-#ifdef SET_VARIABLE_BAUD_RATE
-        uart_channel_config[i].baud = baud_rate;
-#else //SET_VARIABLE_BAUD_RATE
         uart_channel_config[i].baud = MAX_BIT_RATE;
-#endif //SET_VARIABLE_BAUD_RATE
         uart_channel_config[i].char_len = DEF_CHAR_LEN;
         uart_channel_config[i].polarity = start_0;
         uart_channel_config[i].telnet_port = DEF_TELNET_PORT_START_VALUE + i;
-
-#ifdef SET_VARIABLE_BAUD_RATE
-        if (1 == baud_rate_reset)
-        {
-            /* Reset to max baud rate for next channel */
-            baud_rate = 200000;
-            baud_rate_reset = 0;
-        }
-
-        baud_rate = baud_rate / 2;
-
-        if (baud_rate < 10000)
-        {
-            baud_rate = 10000;
-            baud_rate_reset = 1;
-        }
-#endif //SET_VARIABLE_BAUD_RATE
     }
 }
 
@@ -119,8 +91,8 @@ static void uart_channel_init(void)
  *
  *  \param			None
  *  \return			None
- *
  **/
+#pragma unsafe arrays
 static void init_uart_channel_state(void)
 {
     int i;
@@ -135,7 +107,8 @@ static void init_uart_channel_state(void)
         uart_tx_channel_state[i].buf_depth = 0;
         if(i == (UART_TX_CHAN_COUNT - 1))
         {
-            /* Set last channel as currently serviced so that channel queue scan order starts from first channel */
+            /* Set last channel as currently serviced so that channel queue scan
+             * order starts from first channel */
             uart_tx_channel_state[i].is_currently_serviced = TRUE;
         }
         else
@@ -150,7 +123,8 @@ static void init_uart_channel_state(void)
         uart_rx_channel_state[i].buf_depth = 0;
         if(i == (UART_RX_CHAN_COUNT - 1))
         {
-            /* Set last channel as currently serviced so that channel queue scan order starts from first channel */
+            /* Set last channel as currently serviced so that channel queue scan
+             * order starts from first channel */
             uart_rx_channel_state[i].is_currently_serviced = TRUE;
         }
         else
@@ -166,8 +140,8 @@ static void init_uart_channel_state(void)
  *  \param  baud_rate baud rate to check
  *  \return 0         baud_rate ok
  *  \return -1        invalid baud rate
- *
  **/
+#pragma unsafe arrays
 static int check_baud_rate(int baud_rate)
 {
     int i;
@@ -189,7 +163,16 @@ static int check_baud_rate(int baud_rate)
     return -1;
 }
 
-static void send_string_over_channel(char response[], int length, streaming chanend cWbSvr2AppMgr)
+/** =========================================================================
+ *  send_string_over_channel
+ *
+ *  \param  response
+ *  \param  length
+ *  \param  cWbSvr2AppMgr
+ **/
+#pragma unsafe arrays
+static void send_string_over_channel(char response[], int length,
+                                     streaming chanend cWbSvr2AppMgr)
 {
     int i;
     for(i = 0; i < length; i++) { cWbSvr2AppMgr <: response[i]; }
@@ -202,10 +185,10 @@ static void send_string_over_channel(char response[], int length, streaming chan
  *
  *  \param unsigned int	Uart channel identifier
  *  \return		0 		on success
- *
  **/
-//static int validate_uart_params(int ui_command[], char ui_cmd_response[])
-static int validate_uart_params(int ui_command[], streaming chanend cWbSvr2AppMgr)
+#pragma unsafe arrays
+static int validate_uart_params(int ui_command[],
+                                streaming chanend cWbSvr2AppMgr)
 {
     int retVal = 1; //Default Success
     int i = 0;
@@ -308,8 +291,8 @@ static int validate_uart_params(int ui_command[], streaming chanend cWbSvr2AppMg
  *
  *  \param unsigned int	Uart channel identifier
  *  \return		0 		on success
- *
  **/
+#pragma unsafe arrays
 static int configure_uart_channel(unsigned int channel_id)
 {
     int chnl_config_status = ERR_CHANNEL_CONFIG;
@@ -337,8 +320,8 @@ static int configure_uart_channel(unsigned int channel_id)
  *  \param	chanend cTxUART		channel end sharing channel to MUART TX thrd
  *  \param	chanend cRxUART		channel end sharing channel to MUART RX thrd
  *  \return			None
- *
  **/
+#pragma unsafe arrays
 static void apply_default_uart_cfg_and_wait_for_muart_tx_rx_threads(streaming chanend cTxUART,
                                                                     streaming chanend cRxUART)
 {
@@ -369,8 +352,8 @@ static void apply_default_uart_cfg_and_wait_for_muart_tx_rx_threads(streaming ch
  *  \param chanend cUART : channel end of data channel from MUART RX thread
  *  \param unsigned channel_id : uart channel identifir
  *  \return			None
- *
  **/
+#pragma unsafe arrays
 void uart_rx_receive_uart_channel_data( streaming chanend cUART, unsigned channel_id, timer tmr)
 {
     unsigned uart_char, temp;
@@ -411,8 +394,8 @@ void uart_rx_receive_uart_channel_data( streaming chanend cUART, unsigned channe
  *  \param int buf_depth : reference to current depth of uart channel buffer
  *  \return			1	when there is data to send
  *  					0	otherwise
- *
  **/
+#pragma unsafe arrays
 static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr)
 {
     int channel_id = 0;
@@ -457,7 +440,9 @@ static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr
         cAppMgr2WbSvr <: channel_id;
     }
     else
-    outct(cAppMgr2WbSvr, '4'); //NO_UART_DATA_READY
+    {
+        outct(cAppMgr2WbSvr, '4'); //NO_UART_DATA_READY
+    }
 }
 
 /** =========================================================================
@@ -466,28 +451,33 @@ static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr
  *
  *  \param chanend cAppMgr2WbSvr : Channel to exchange telnet data
  *  \return			None
- *
  **/
+#pragma unsafe arrays
 static void collect_uart_tx_data(chanend cAppMgr2WbSvr)
 {
     int buf_depth_available = -1;
     int i = 0;
     int channel_id = -1;
     char chan_data;
+    int write_index = 0;
 
     cAppMgr2WbSvr :> channel_id;
     buf_depth_available = TX_CHANNEL_FIFO_LEN - uart_tx_channel_state[channel_id].buf_depth;
     cAppMgr2WbSvr <: buf_depth_available;
     cAppMgr2WbSvr :> buf_depth_available; //This now contains only required buf depth to send
 
+    write_index = uart_tx_channel_state[channel_id].write_index;
+
     for (i = 0; i < buf_depth_available; i++)
     {
         cAppMgr2WbSvr :> chan_data;
-        uart_tx_channel_state[channel_id].channel_data[uart_tx_channel_state[channel_id].write_index] = (char)chan_data;
-        uart_tx_channel_state[channel_id].write_index++;
-        if (uart_tx_channel_state[channel_id].write_index >= TX_CHANNEL_FIFO_LEN) { uart_tx_channel_state[channel_id].write_index = 0; }
-        uart_tx_channel_state[channel_id].buf_depth++;
+        uart_tx_channel_state[channel_id].channel_data[write_index] = (char)chan_data;
+        write_index++;
+        if (write_index >= TX_CHANNEL_FIFO_LEN) { write_index = 0; }
     }
+
+    uart_tx_channel_state[channel_id].write_index = write_index;
+    uart_tx_channel_state[channel_id].buf_depth += buf_depth_available;
 }
 
 /** =========================================================================
@@ -503,39 +493,39 @@ static void collect_uart_tx_data(chanend cAppMgr2WbSvr)
  *  \param int buf_depth : reference to current depth of uart channel buffer
  *  \return			1	when there is data to send
  *  					0	otherwise
- *
  **/
+#pragma unsafe arrays
 static void uart_rx_send_uart_channel_data(chanend cAppMgr2WbSvr)
 {
     int i = 0;
-    int local_read_index = 0;
-
     int channel_id = 0;
     int read_index = 0;
     unsigned int buf_depth = 0;
-    char buffer[] = "";
 
+    /* Get channel id*/
     cAppMgr2WbSvr :> channel_id;
-    read_index = uart_rx_channel_state[channel_id].read_index;
+
     buf_depth = uart_rx_channel_state[channel_id].buf_depth;
+    read_index = uart_rx_channel_state[channel_id].read_index;
 
     /* Send Uart X buffer depth */
     cAppMgr2WbSvr <: buf_depth;
-    local_read_index = read_index; // TODO: Bug: Data for chnl 7 is always present
 
     for (i=0; i<buf_depth; i++)
     {
         /* Send Uart X data over channel */
-        cAppMgr2WbSvr <: uart_rx_channel_state[channel_id].channel_data[local_read_index];
-        local_read_index++;
-        if (local_read_index >= RX_CHANNEL_FIFO_LEN) { local_read_index = 0; }
+        cAppMgr2WbSvr <: uart_rx_channel_state[channel_id].channel_data[read_index];
+
+        /* increment read index*/
+        read_index++;
+
+        /* Circle buffer */
+        if (read_index >= RX_CHANNEL_FIFO_LEN) { read_index = 0; }
     }
 
-    /* Data is pushed to app manager thread; Update buffer state pointers */
-    read_index += buf_depth;
-    if (read_index > (RX_CHANNEL_FIFO_LEN-1)) { read_index -= RX_CHANNEL_FIFO_LEN; }
+    /* update buffer pointers */
     uart_rx_channel_state[channel_id].read_index = read_index;
-    uart_rx_channel_state[channel_id].buf_depth -= buf_depth; //= 0;
+    uart_rx_channel_state[channel_id].buf_depth  = 0;
 }
 
 /** =========================================================================
@@ -547,8 +537,8 @@ static void uart_rx_send_uart_channel_data(chanend cAppMgr2WbSvr)
  *
  *  \param 			None
  *  \return			None
- *
  **/
+#pragma unsafe arrays
 void uart_tx_fill_uart_channel_data_from_queue()
 {
     int channel_id;
@@ -593,7 +583,6 @@ void uart_tx_fill_uart_channel_data_from_queue()
  *  \param	chanend cTxUART		channel end sharing channel to MUART TX thrd
  *  \param	chanend cRxUART		channel end sharing channel to MUART RX thrd
  *  \return			None
- *
  **/
 #pragma unsafe arrays
 static int re_apply_uart_channel_config(int channel_id,
@@ -617,32 +606,27 @@ static int re_apply_uart_channel_config(int channel_id,
  *
  *  \param	chanend cWbSvr2AppMgr channel end sharing web server thread
  *  \return			None
- *
  **/
+#pragma unsafe arrays
 static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
                                    streaming chanend cTxUART,
                                    streaming chanend cRxUART)
 {
     char ui_cmd_unparsed[UI_COMMAND_LENGTH];
-    char ui_cmd_response[UI_COMMAND_LENGTH]; //TODO; Chk if this can be optimized
     int ui_command[NUM_UI_PARAMS];
     int cmd_length = 0;
     char cmd_type;
-
-    int i, j;
+	int i = 0, j =0;
     int iTemp = 0;
-    char dv[20]; //
     int index_start = 0;
     int index_end = 0;
     int index_cfg = -1;
     int index_uart = 0;
     char ui_param[20];
+    int done = 0;
 
     /* Get UART command data */
     {
-        int done = 0;
-        int i = 0;
-
         do
         {
             cWbSvr2AppMgr :> ui_cmd_unparsed[i];
@@ -654,7 +638,8 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
             {
                 i++;
             }
-        } while(done == 0);
+        } while((done == 0) && (i < UI_COMMAND_LENGTH));
+
         cmd_length = i;
     }
 
@@ -676,15 +661,15 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
                 /* Clear the array */
                 for (iTemp = 0; iTemp < 20; iTemp++)
                 {
-                    dv[iTemp] = '\0';
+                	ui_param[iTemp] = '\0';
                 }
 
                 for (j = 0; j < (i - index_start); j++)
                 {
-                    dv[j] = ui_cmd_unparsed[j + index_start];
+                	ui_param[j] = ui_cmd_unparsed[j + index_start];
                 }
 
-                ui_command[index_cfg] = atoi(dv);
+                ui_command[index_cfg] = atoi(ui_param);
                 index_end = 0;
                 index_start = 0;
             } //else [if (index_end == 0)]
@@ -692,7 +677,6 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
     } //for (i = 0; i < cmd_length; i++)
 
     // Now process the Command request
-    //if (validate_uart_params(ui_command, ui_cmd_response) //TODO
     if (validate_uart_params(ui_command, cWbSvr2AppMgr))
     {
         cmd_type = ui_command[0] + 48; // +48 for char
@@ -732,12 +716,15 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
             cWbSvr2AppMgr <: MARKER_START;
             if (0 != ui_command[i])
             {
+            	/* Function similar to itoa */
                 while(0 != ui_command[i])
                 {
                     ui_param[j] = ui_command[i]%10;
                     ui_command[i] = ui_command[i]/10;
                     j++;
                 }
+
+                /* Need to send the data in MSB -> LSB order */
                 while(0 != j)
                 {
                     cWbSvr2AppMgr <: (char)(ui_param[j-1] + 48);
@@ -754,7 +741,7 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
     }
 }
 
-/** 
+/** =========================================================================
  *  The multi uart manager thread. This thread
  *  (i) periodically polls for data on application Tx buffer, in order to transmit to telnet clients
  *  (ii) waits for channel data from MUART Rx thread
@@ -763,8 +750,8 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
  *  \param	chanend cTxUART		channel end sharing channel to MUART TX thrd
  *  \param	chanend cRxUART		channel end sharing channel to MUART RX thrd
  *  \return	None
- *
  */
+#pragma unsafe arrays
 void app_manager_handle_uart_data( streaming chanend cWbSvr2AppMgr,
                                   chanend cAppMgr2WbSvr,
                                   streaming chanend cTxUART,
@@ -782,8 +769,7 @@ void app_manager_handle_uart_data( streaming chanend cWbSvr2AppMgr,
     unsigned char tok;
     int write_index;
 
-    //TODO: Flash cold start should happen here
-    /* Applying default in-program values, in case Cold start fails */
+    // Apply default Uart settings
     uart_channel_init();
 
     for(i = 0; i < UART_TX_CHAN_COUNT; i++)
@@ -803,7 +789,6 @@ void app_manager_handle_uart_data( streaming chanend cWbSvr2AppMgr,
         select
         {
 #pragma ordered
-#pragma xta endpoint "ep_1"
             case cRxUART :> rx_channel_id:
             {
                 //Read data from MUART RX thread
@@ -871,4 +856,11 @@ void app_manager_handle_uart_data( streaming chanend cWbSvr2AppMgr,
     } // while(1)
 }
 
-//#pragma xta command "analyze function uart_rx_receive_uart_channel_data"
+#if 0
+
+#pragma xta command "echo --------------------------------------------------"
+#pragma xta command "echo AM-URRUCD"
+#pragma xta command "analyze function uart_rx_receive_uart_channel_data"
+#pragma xta command "print nodeinfo - -"
+
+#endif

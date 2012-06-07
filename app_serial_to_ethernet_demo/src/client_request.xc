@@ -5,10 +5,10 @@
 
 /*===========================================================================
  Filename: client_request.xc
-Project :
-Author  :
-Version :
-Purpose
+ Project :
+ Author  :
+ Version :
+ Purpose
  This file is a common UI for clients to talk to app_manager. Only app_manager
  can change settings (or) see the UART configuration. Hence, all clients must
  talk via this file to talk to app_manager.
@@ -31,42 +31,42 @@ Purpose
  For SET, the command is '2' and should be followed by the settings and
  terminated with MARKER_END
 
------------------------------------------------------------------------------
+ -----------------------------------------------------------------------------
 
 
-===========================================================================*/
+ ===========================================================================*/
 
 /*---------------------------------------------------------------------------
-include files
----------------------------------------------------------------------------*/
+ include files
+ ---------------------------------------------------------------------------*/
 #include "client_request.h"
 #include "s2e_flash.h"
 #include "common.h"
 #include <string.h>
 
 /*---------------------------------------------------------------------------
-constants
----------------------------------------------------------------------------*/
+ constants
+ ---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------
-ports and clocks
----------------------------------------------------------------------------*/
+ ports and clocks
+ ---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------
-typedefs
----------------------------------------------------------------------------*/
+ typedefs
+ ---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------
-global variables
----------------------------------------------------------------------------*/
+ global variables
+ ---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------
-static variables
----------------------------------------------------------------------------*/
+ static variables
+ ---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------
-prototypes
----------------------------------------------------------------------------*/
+ prototypes
+ ---------------------------------------------------------------------------*/
 static int get_marker_index(char gmi_data[], int gmi_length, char gmi_marker);
 
 static void get_response_data(streaming chanend cWbSvr2AppMgr,
@@ -92,25 +92,25 @@ static int exchange_data_with_am(streaming chanend cWbSvr2AppMgr,
                                  int end);
 
 /*---------------------------------------------------------------------------
-implementation
----------------------------------------------------------------------------*/
+ implementation
+ ---------------------------------------------------------------------------*/
 
 /** =========================================================================
  *  parse_client_request
-*
+ *
  *  \param streaming chanend    cWbSvr2AppMgr channel webserver to appmanager
  *  \param chanend              cPersData     channel for flash access
  *  \param char                 data          data from client
  *  \param char                 response      response to client
  *  \param int                  data_length   length of data from client
-*
-**/
+ *
+ **/
 #pragma unsafe arrays
 #ifndef FLASH_THREAD
 int parse_client_request(streaming chanend cWbSvr2AppMgr,
-                         char data[],
-                         char response[],
-                         int data_length)
+                char data[],
+                char response[],
+                int data_length)
 #else //FLASH_THREAD
 int parse_client_request(streaming chanend cWbSvr2AppMgr,
                          chanend cPersData,
@@ -120,7 +120,7 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
 #endif //FLASH_THREAD
 {
     char command;
-    int i, j, k, ix_start, ix_end, config_address, temp_start, temp_end;
+    int i, j, k, ix_start, ix_end, config_address;
     char flash_data[FLASH_SIZE_PAGE];
 
     // capture first config start marker
@@ -134,9 +134,9 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
 
     // clear array
     clear_char_array(flash_data, FLASH_SIZE_PAGE);
-    clear_char_array(response, FLASH_SIZE_PAGE);
+    clear_char_array(response, UI_COMMAND_LENGTH);
 
-    switch(command)
+    switch (command)
     {
         /* ====================================
          * GET
@@ -183,11 +183,11 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
                 // exchange data with am
                 exchange_data_with_am(cWbSvr2AppMgr, data, response, 0, 6);
                 // find marker positions in the response from app_manager
-                temp_start = get_marker_index(response, UI_COMMAND_LENGTH, MARKER_START);
-                temp_end = get_marker_index(response, UI_COMMAND_LENGTH, MARKER_END);
+                ix_start = get_marker_index(response, UI_COMMAND_LENGTH, MARKER_START);
+                ix_end = get_marker_index(response, UI_COMMAND_LENGTH, MARKER_END);
                 // flash_data is one big char array that must be stored in flash
                 // append response to flash_data
-                for(j = temp_start; j <= temp_end; j++)
+                for(j = ix_start; j <= ix_end; j++)
                 {
                     flash_data[k] = response[j]; k++;
                 }
@@ -233,14 +233,14 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
                 for(i = 0; i < UART_APP_TX_CHAN_COUNT; i++)
                 {
                     // find markers stored in flash
-                    temp_start = get_marker_index(flash_data, FLASH_SIZE_PAGE, MARKER_START);
-                    temp_end = get_marker_index(flash_data, FLASH_SIZE_PAGE, MARKER_END);
+                    ix_start = get_marker_index(flash_data, FLASH_SIZE_PAGE, MARKER_START);
+                    ix_end = get_marker_index(flash_data, FLASH_SIZE_PAGE, MARKER_END);
                     // replace command and channel
-                    create_set_command(flash_data, i, temp_start);
+                    create_set_command(flash_data, i, ix_start);
                     // exchange data with am
-                    exchange_data_with_am(cWbSvr2AppMgr, flash_data, response, temp_start, temp_end);
+                    exchange_data_with_am(cWbSvr2AppMgr, flash_data, response, ix_start, ix_end);
                     // replace previous data with zero to avoid marker find above
-                    replace_with_zero(flash_data, 0, temp_end);
+                    replace_with_zero(flash_data, 0, ix_end);
                 } // for(i = 0; i < UART_APP_TX_CHAN_COUNT; i++)
             } // else
 
@@ -258,14 +258,14 @@ int parse_client_request(streaming chanend cWbSvr2AppMgr,
 
 /** =========================================================================
  *  exchange_data_with_am
-*
+ *
  *  \param streaming chanend cWbSvr2AppMgr channel webserver to appmanager
  *  \param char              data          data from client
  *  \param char              response      response to client
  *  \param int               start         start index - place of MARKER_START
  *  \param int               end           end index - place of MARKER_END
-*
-**/
+ *
+ **/
 #pragma unsafe arrays
 static int exchange_data_with_am(streaming chanend cWbSvr2AppMgr,
                                  char data[],
@@ -281,25 +281,25 @@ static int exchange_data_with_am(streaming chanend cWbSvr2AppMgr,
 
 /** =========================================================================
  *  get_marker_index
-*
+ *
  *  \param char gmi_data    data array
  *  \param int  gmi_length  length of data array
  *  \param char gmi_marker  marker to search for
-*
-**/
+ *
+ **/
 #pragma unsafe arrays
 static int get_marker_index(char gmi_data[], int gmi_length, char gmi_marker)
 {
     int i;
     // capture marker
-    for(i = 0; i < gmi_length; i++)
+    for (i = 0; i < gmi_length; i++)
     {
-        if(gmi_data[i] == gmi_marker)
+        if (gmi_data[i] == gmi_marker)
         {
             break;
         }
     }
-    if(i == gmi_length)
+    if (i == gmi_length)
     {
         // Return error response
         return 0; // Must return error as no 'marker enclosed' config data found
@@ -309,11 +309,12 @@ static int get_marker_index(char gmi_data[], int gmi_length, char gmi_marker)
 
 /** =========================================================================
  *  get_response_data
-*
+ *
  *  \param streaming chanend cWbSvr2AppMgr channel webserver to appmanager
  *  \param char              grd_response  response from appmanager
-*
-**/
+ *
+ **/
+#pragma unsafe arrays
 static void get_response_data(streaming chanend cWbSvr2AppMgr,
                               char grd_response[])
 {
@@ -330,20 +331,21 @@ static void get_response_data(streaming chanend cWbSvr2AppMgr,
 
 /** =========================================================================
  *  send_to_channel
-*
+ *
  *  \param streaming chanend cWbSvr2AppMgr channel webserver to appmanager
  *  \param char              stc_data      data to send to appmanager
  *  \param int               stc_start     start index
  *  \param int               stc_end       end index
-*
-**/
+ *
+ **/
+#pragma unsafe arrays
 static void send_to_channel(streaming chanend cWbSvr2AppMgr,
                             char stc_data[],
                             int stc_start,
                             int stc_end)
 {
     int i;
-	cWbSvr2AppMgr <: UART_CMD_FROM_APP_TO_UART;
+    cWbSvr2AppMgr <: UART_CMD_FROM_APP_TO_UART;
     for(i = stc_start; i <= stc_end; i++)
     {
         cWbSvr2AppMgr <: stc_data[i];
@@ -357,6 +359,7 @@ static void send_to_channel(streaming chanend cWbSvr2AppMgr,
  *  \param int  length   length of character array
  *
  **/
+#pragma unsafe arrays
 static void clear_char_array(char c[], int length)
 {
     int i;
@@ -374,6 +377,7 @@ static void clear_char_array(char c[], int length)
  *  \param int  rwz_end    end index to clear
  *
  **/
+#pragma unsafe arrays
 static void replace_with_zero(char rwz_c[], int rwz_start, int rwz_end)
 {
     int i;
@@ -390,13 +394,14 @@ static void replace_with_zero(char rwz_c[], int rwz_start, int rwz_end)
  *  \param int  cc_channel  GET for this channel
  *
  **/
+#pragma unsafe arrays
 static void create_get_command(char cc_data[], int cc_channel)
 {
     cc_data[0] = MARKER_START;
     cc_data[1] = CMD_CONFIG_GET;
     cc_data[2] = MARKER_START;
     cc_data[3] = MARKER_START;
-    cc_data[4] = (char)(cc_channel + 48);
+    cc_data[4] = (char) (cc_channel + 48);
     cc_data[5] = MARKER_START;
     cc_data[6] = MARKER_END;
 }
@@ -409,10 +414,11 @@ static void create_get_command(char cc_data[], int cc_channel)
  *  \param int  index       start index in data array for SET command
  *
  **/
+#pragma unsafe arrays
 static void create_set_command(char cc_data[], int cc_channel, int index)
 {
     cc_data[index + 1] = CMD_CONFIG_SET;
-    cc_data[index + 4] = (char)(cc_channel + 48);
+    cc_data[index + 4] = (char) (cc_channel + 48);
 }
 
 /*=========================================================================*/

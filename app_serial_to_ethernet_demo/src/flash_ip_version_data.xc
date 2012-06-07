@@ -25,7 +25,7 @@
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
-//#define FLASH_CHECKSUM
+#define USE_STATIC_IP   0
 
 /*---------------------------------------------------------------------------
  ports and clocks
@@ -38,6 +38,18 @@
 /*---------------------------------------------------------------------------
  global variables
  ---------------------------------------------------------------------------*/
+xtcp_ipconfig_t xtcp_ipconfig =
+{
+#if USE_STATIC_IP
+ { 169, 254, 196, 178 },
+ { 255, 255, 0, 0 },
+ { 0, 0, 0, 0 }
+#else
+ { 0, 0, 0, 0 },
+ { 0, 0, 0, 0 },
+ { 0, 0, 0, 0 }
+#endif
+};
 
 /*---------------------------------------------------------------------------
  static variables
@@ -59,17 +71,25 @@
  *  \param address
  *
  **/
+#ifndef FLASH_THREAD
+void flash_write_ip_data(xtcp_ipconfig_t ipconfig,
+                         unsigned address)
+#else
 void flash_write_ip_data(chanend cPersData,
                          xtcp_ipconfig_t ipconfig,
                          unsigned address)
+#endif
 {
     unsigned i;
-    unsigned checksum = IP_SECTOR_MAGIC_NUMBER_CKSUM; //This is the checksum for 0xCAFEF00D
     unsigned char flash_data[FLASH_SIZE_PAGE];
     int flash_result;
 
     // Read data from flash
+#ifndef FLASH_THREAD
+    flash_result = read_from_flash(address, flash_data);
+#else
     flash_result = flash_access(FLASH_DATA_READ, flash_data, address, cPersData);
+#endif
 
     for(i = 0; i < 4; i++ )
     {
@@ -81,17 +101,13 @@ void flash_write_ip_data(chanend cPersData,
         flash_data[ i+8 ] = ipconfig.netmask[i];
         flash_data[ i+12 ] = ipconfig.gateway[i];
     }
-#ifdef FLASH_CHECKSUM
-    for(i=4;i<16;i++)
-    {
-        checksum += flash_data[i];
-    }
-    flash_data[16] = checksum&0xff;
-    flash_data[17] = (checksum>>8)&0xff;
-#endif
 
     // Write data to flash
+#ifndef FLASH_THREAD
+    flash_result = write_to_flash(address, flash_data);
+#else
     flash_result = flash_access(FLASH_DATA_WRITE, flash_data, address, cPersData);
+#endif
 }
 
 /** =========================================================================
@@ -113,7 +129,11 @@ void flash_write_version_data(chanend cPersData,
     int flash_result;
 
     // Read data from flash
+#ifndef FLASH_THREAD
+    flash_result = read_from_flash(address, flash_data);
+#else
     flash_result = flash_access(FLASH_DATA_READ, flash_data, address, cPersData);
+#endif
 
     for(i = 0; i < version_size; i++)
     {
@@ -121,7 +141,11 @@ void flash_write_version_data(chanend cPersData,
     }
 
     // Write data to flash
+#ifndef FLASH_THREAD
+    flash_result = write_to_flash(address, flash_data);
+#else
     flash_result = flash_access(FLASH_DATA_WRITE, flash_data, address, cPersData);
+#endif
 }
 
 /** =========================================================================
@@ -143,7 +167,11 @@ void flash_read_version_data(chanend cPersData,
     int flash_result;
 
     // Read data from flash
+#ifndef FLASH_THREAD
+    flash_result = read_from_flash(address, flash_data);
+#else
     flash_result = flash_access(FLASH_DATA_READ, flash_data, address, cPersData);
+#endif
 
     for(i = 0; i < version_size; i++)
     {
@@ -158,61 +186,33 @@ void flash_read_version_data(chanend cPersData,
  *  \param address
  *
  **/
+#ifndef FLASH_THREAD
+xtcp_ipconfig_t flash_read_ip_data(unsigned address)
+#else
 xtcp_ipconfig_t flash_read_ip_data(chanend cPersData, unsigned address)
+#endif
 {
-    unsigned i, checksum = IP_SECTOR_MAGIC_NUMBER_CKSUM, o_checksum;
+    unsigned i;
     unsigned char flash_data[FLASH_SIZE_PAGE];
-    xtcp_ipconfig_t ipconfig;
     int flash_result;
 
-    xtcp_ipconfig_t dhcp_ipconfig =
-    {
-     { 0, 0, 0, 0 },
-     { 0, 0, 0, 0 },
-     { 0, 0, 0, 0 }
-    };
-
     // Read data from flash
+#ifndef FLASH_THREAD
+    flash_result = read_from_flash(address, flash_data);
+#else
     flash_result = flash_access(FLASH_DATA_READ, flash_data, address, cPersData);
+#endif
 
     if((flash_data[0]|(flash_data[1]<<8)|(flash_data[2]<<16)|(flash_data[3]<<24)) == IP_SECTOR_MAGIC_NUMBER )
     {
-#ifdef FLASH_CHECKSUM
-        for(i=4;i<16;i++)
-        {
-            checksum+= flash_data[i];
-        }
-        o_checksum = flash_data[16] + (flash_data[17]<<8);
-        if(checksum == o_checksum)
-        {
-            for(i = 0; i < 4; i++ )
-            {
-                ipconfig.ipaddr[i] = flash_data[ i+4 ];
-                ipconfig.netmask[i] = flash_data[ i+8 ];
-                ipconfig.gateway[i] = flash_data[ i+12 ];
-            }
-            return ipconfig;
-        }
-        else
-        {
-            return dhcp_ipconfig;
-        }
-#else
         for(i = 0; i < 4; i++ )
         {
-            ipconfig.ipaddr[i] = flash_data[ i+4 ];
-            ipconfig.netmask[i] = flash_data[ i+8 ];
-            ipconfig.gateway[i] = flash_data[ i+12 ];
+            xtcp_ipconfig.ipaddr[i] = flash_data[ i+4 ];
+            xtcp_ipconfig.netmask[i] = flash_data[ i+8 ];
+            xtcp_ipconfig.gateway[i] = flash_data[ i+12 ];
         }
-
-        return ipconfig;
-#endif
-
     }
-    else
-    {
-        return dhcp_ipconfig;
-    }
+    return xtcp_ipconfig;
 }
 
 /*=========================================================================*/

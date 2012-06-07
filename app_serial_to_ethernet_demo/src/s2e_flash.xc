@@ -4,7 +4,7 @@
 // LICENSE.txt and at <http://github.xcore.com/>
 
 /*===========================================================================
- Filename:
+ Filename: s2e_flash.xc
  Project :
  Author  :
  Version :
@@ -117,6 +117,7 @@ static int connect_flash()
  *  \param char data     array where read data will be stored
  *  \return int          S2E_FLASH_OK / S2E_FLASH_ERROR
  **/
+#pragma unsafe arrays
 int read_from_flash(int address, char data[])
 {
     // connect to flash
@@ -137,9 +138,9 @@ int read_from_flash(int address, char data[])
  *  \return int          S2E_FLASH_OK / S2E_FLASH_ERROR
  *
  **/
+#pragma unsafe arrays
 int write_to_flash(int address, char data[])
 {
-    int address_copy = address;
     int ix_sector;
     int num_sectors;
     int sector;
@@ -179,9 +180,10 @@ int write_to_flash(int address, char data[])
  *  get_flash_data_address
  *
  *  \param data_type    CONFIG / IPVER
- *  \return int          S2E_FLASH_OK / S2E_FLASH_ERROR
+ *  \return int         S2E_FLASH_OK / S2E_FLASH_ERROR
  *
  **/
+#pragma unsafe arrays
 int get_flash_data_address(int data_type)
 {
     int total_rom_bytes;
@@ -266,6 +268,7 @@ int flash_read_rom(int page, char data[])
  *                           (Flash port present in Core0)
  *
  **/
+#pragma unsafe arrays
 void flash_data_access(chanend cPersData)
 {
     char channel_data;
@@ -291,11 +294,11 @@ void flash_data_access(chanend cPersData)
                     // send data if flash read was ok
                     if(S2E_FLASH_OK == flash_result)
                     {
-                    for(i = 0; i < FLASH_SIZE_PAGE; i++)
-                    {
-                        cPersData <: flash_page_data[i];
+                        for(i = 0; i < FLASH_SIZE_PAGE; i++)
+                        {
+                            cPersData <: flash_page_data[i];
+                        }
                     }
-                }
                 }
                 else if(FLASH_DATA_WRITE == channel_data)
                 {
@@ -318,11 +321,11 @@ void flash_data_access(chanend cPersData)
                     // send data if flash read was ok
                     if(S2E_FLASH_OK == flash_result)
                     {
-                    for(i = 0; i < FLASH_SIZE_PAGE; i++)
-                    {
-                        cPersData <: flash_page_data[i];
+                        for(i = 0; i < FLASH_SIZE_PAGE; i++)
+                        {
+                            cPersData <: flash_page_data[i];
+                        }
                     }
-                }
                 }
                 else if(FLASH_GET_DATA_ADDRESS == channel_data)
                 {
@@ -348,6 +351,7 @@ void flash_data_access(chanend cPersData)
 *  see: s2e_flash.xc: flash_data_access()
 *
 **/
+#pragma unsafe arrays
 int flash_access(char flash_operation, char data[], int address, chanend cPersData)
 {
     int i, rtnval, flash_result;
@@ -362,10 +366,10 @@ int flash_access(char flash_operation, char data[], int address, chanend cPersDa
 
             if(S2E_FLASH_OK == flash_result)
             {
-            for(i = 0; i < FLASH_SIZE_PAGE; i++)
-            {
-                cPersData :> data[i];
-            }
+                for(i = 0; i < FLASH_SIZE_PAGE; i++)
+                {
+                    cPersData :> data[i];
+                }
             }
             break;
         }
@@ -393,10 +397,10 @@ int flash_access(char flash_operation, char data[], int address, chanend cPersDa
 
             if(S2E_FLASH_OK == flash_result)
             {
-            for(i = 0; i < FLASH_SIZE_PAGE; i++)
-            {
-                cPersData :> data[i];
-            }
+                for(i = 0; i < FLASH_SIZE_PAGE; i++)
+                {
+                    cPersData :> data[i];
+                }
             }
             break;
         }

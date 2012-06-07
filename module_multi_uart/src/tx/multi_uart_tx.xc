@@ -90,7 +90,7 @@ void run_multi_uart_tx( streaming chanend cUART, s_multi_uart_tx_ports &tx_ports
 	while (1)
 	{
 		    /* process the next bit on the ports */
-		    #pragma xta endpoint "tx_bit_ep0"
+		    //#pragma xta endpoint "tx_bit_ep0"
 		    tx_ports.pUart @ port_ts <: port_val;
 		    port_ts += PORT_TS_INC;
 
@@ -98,7 +98,7 @@ void run_multi_uart_tx( streaming chanend cUART, s_multi_uart_tx_ports &tx_ports
 		    #pragma loop unroll UART_TX_CHAN_COUNT
 		    for (int i = 0; i < UART_TX_CHAN_COUNT; i++)
 		    {
-		        #pragma xta label "update_loop"
+		        //#pragma xta label "update_loop"
 		        tick_count[i]--;
 		        /* active and counter tells us we need to send a bit */
 		        if (tick_count[i] == 0 && current_word_pos[i])
@@ -127,7 +127,7 @@ void run_multi_uart_tx( streaming chanend cUART, s_multi_uart_tx_ports &tx_ports
 		    /* check for request to pause for reconfigure */
 		    select
 		    {
-		        #pragma xta endpoint "tx_bit_ep1"
+		        //#pragma xta endpoint "tx_bit_ep1"
 		        case cUART :> int v: // anything here will pause the TX thread
 		            
 		            /* set port to IDLE */

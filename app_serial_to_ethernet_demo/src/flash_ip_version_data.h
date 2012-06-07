@@ -24,9 +24,7 @@
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
-
 #define IP_SECTOR_MAGIC_NUMBER          0xCAFEF00D
-#define IP_SECTOR_MAGIC_NUMBER_CKSUM    0x2C7
 
 /*---------------------------------------------------------------------------
  extern variables
@@ -44,11 +42,22 @@
  prototypes
  ---------------------------------------------------------------------------*/
 
-xtcp_ipconfig_t flash_read_ip_data(chanend cPersData, unsigned address);
+#ifndef FLASH_THREAD
+
+void flash_write_ip_data(xtcp_ipconfig_t ipconfig,
+                         unsigned address);
+
+xtcp_ipconfig_t flash_read_ip_data(unsigned address);
+
+#else
 
 void flash_write_ip_data(chanend cPersData,
                          xtcp_ipconfig_t ipconfig,
                          unsigned address);
+
+xtcp_ipconfig_t flash_read_ip_data(chanend cPersData, unsigned address);
+
+#endif
 
 void flash_write_version_data(chanend cPersData,
                               unsigned char version_size,

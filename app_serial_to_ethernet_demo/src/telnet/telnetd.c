@@ -8,6 +8,7 @@
 #include "xtcp_buffered_client.h"
 #include "telnetd.h"
 #include "telnet_protocol.h"
+#include "telnetd_conf.h"
 
 // Structure to hold Telnet state
 typedef struct telnetd_state_t {
@@ -35,21 +36,6 @@ enum parse_state {
   PARSING_EOL
 };
 
-/* Declaration of callback function */
-void (*application_callback)(xtcp_connection_t *conn, char data);
-
-/* Default call back function, in case application does not
- * require to provide a call back */
-void default_callback(xtcp_connection_t *conn, char data)
-{
-	;
-}
-
-/* Declaration to register a callback function */
-void register_callback(void (*fnCallBack)(xtcp_connection_t *, char ))
-{
-	application_callback = fnCallBack;
-}
 
 /* Initiate the telnet state and listen on configured telnet port */
 void telnetd_init(chanend tcp_svr)
@@ -63,7 +49,6 @@ void telnetd_init(chanend tcp_svr)
       connection_states[i].active = 0;
       connection_states[i].index = i;
     }
-  register_callback(default_callback);
 }
 
 /* Initiate telnet state and register default callback function */
@@ -77,16 +62,9 @@ void telnetd_init_conn(chanend tcp_svr)
       connection_states[i].index = i;
     }
 
-  register_callback(default_callback);
+
 }
 
-/* invoke application registered callback function */
-void application_callback_handler(xtcp_connection_t *conn,
-								  char data,
-								  void (*fnAppCallBack)(xtcp_connection_t *, char))
-{
-	fnAppCallBack(conn, data);
-}
 
 // Parses a HTTP request for a GET
 static int parse_telnet_stream(chanend tcp_svr,
@@ -179,7 +157,8 @@ static int parse_telnet_stream(chanend tcp_svr,
             //hs->line_buf_in[hs->inptr] = data[i];
             hs->inptr++;
             /* Invoke application registered call back function */
-            application_callback_handler(conn, data[i],application_callback);
+            TELNET_APPLICATION_CALLBACK(conn, data[i]);
+
             actual_data[j] = data[i];
             j++;
           }
@@ -189,8 +168,6 @@ static int parse_telnet_stream(chanend tcp_svr,
       break;
     case PARSING_EOL:
       if (data[i] == LF) {
-        //telnetd_recv_line(tcp_svr, hs->index, hs->line_buf_in, hs->inptr);
-        telnetd_recv_line(tcp_svr, hs->index, hs->inptr);
         hs->inptr = 0;
         actual_data[j] = LF;
         j++;
@@ -214,7 +191,7 @@ static int parse_telnet_stream(chanend tcp_svr,
 /* This stack value must be manually changed */
 /* This pragma provides a stack bound to any application function that is
  * registered as a callback function */
-#pragma stackfunction 100
+//#pragma stackfunction 100
 void telnetd_recv(chanend tcp_svr, xtcp_connection_t *conn)
 {
 	struct telnetd_state_t *hs = (struct telnetd_state_t *) conn->appstate;
@@ -234,7 +211,7 @@ void telnetd_recv(chanend tcp_svr, xtcp_connection_t *conn)
 /* This stack value must be manually changed */
 /* This pragma provides a stack bound to any application function that is
  * registered as a callback function */
-#pragma stackfunction 100
+//#pragma stackfunction 100
 int telnetd_recv_data(chanend tcp_svr, xtcp_connection_t *conn, char *data, char *actual_data)
 {
 	struct telnetd_state_t *hs = (struct telnetd_state_t *) conn->appstate;

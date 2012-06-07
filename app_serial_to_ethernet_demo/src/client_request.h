@@ -6,7 +6,7 @@
  Filename: debug.h
  Project : app_serial_to_ethernet_demo
  Author  : XMOS Ltd
- Version : 1v0
+ Version : 1v1v3
  Purpose : This file control level of debug trace
  -----------------------------------------------------------------------------
 

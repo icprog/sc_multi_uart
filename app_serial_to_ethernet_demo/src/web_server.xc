@@ -28,13 +28,18 @@
 #include "client_request.h"
 #include <stdlib.h>
 #include "flash_ip_version_data.h"
+#include "xtcp_client_conf.h"
 
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
-//#define PROCESS_USER_DATA_TMR_EVENT_INTRVL		(TIMER_FREQUENCY /	\
-//										(MAX_BIT_RATE * UART_APP_TX_CHAN_COUNT))
-#define PROCESS_USER_DATA_TMR_EVENT_INTRVL	3000 //500
+#define XTCP_RECD_BUF_SIZE                  UIP_CONF_RECEIVE_WINDOW
+#define PROCESS_USER_DATA_TMR_EVENT_INTRVL  3000
+
+/*
+ * #define PROCESS_USER_DATA_TMR_EVENT_INTRVL (TIMER_FREQUENCY / (MAX_BIT_RATE * UART_APP_TX_CHAN_COUNT))
+ */
+
 /*---------------------------------------------------------------------------
  ports and clocks
  ---------------------------------------------------------------------------*/
@@ -79,7 +84,7 @@ typedef struct STRUCT_XTCP_RECD_DATA_BUFFERS
     int write_index; //Input data to Tx api
     int telnet_recd_data_index; //TODO: TBR
     unsigned buf_depth; //depth of buffer to be consumed
-    char telnet_recd_data[XTCP_CLIENT_BUF_SIZE * 2];
+    char telnet_recd_data[XTCP_RECD_BUF_SIZE];
     e_bool is_currently_serviced;
 }s_xtcp_recd_data_fifo;
 
@@ -118,9 +123,8 @@ int gPollForSendingUartDataToUartTx; //0 Initially reset this
 int gPollForTelnetCommandData; //0 Initially reset this
 
 int g_UartTxNumToSend;
-char g_telnet_recd_data_buffer[XTCP_CLIENT_BUF_SIZE];
-char g_telnet_actual_data_buffer[XTCP_CLIENT_BUF_SIZE];
-
+char g_telnet_recd_data_buffer[UIP_CONF_RECEIVE_WINDOW];
+char g_telnet_actual_data_buffer[UIP_CONF_RECEIVE_WINDOW];
 /* Broadcast Discovery Feature related declarations */
 xtcp_connection_t g_BroadcastServerConn;
 xtcp_connection_t g_BroadcastResponseConn;
@@ -135,7 +139,7 @@ xtcp_ipconfig_t g_ipconfig;
 unsigned char g_mac_addr[6];
 int g_int_ipconfig[4];
 int g_int_mac_addr[6];
-char g_FirmwareVer[10] = "1.1.2";
+char g_FirmwareVer[10] = "1.1.3";
 
 //char g_RespString[80] = "XMOS S2E VER:a.b.c;MAC:xx:xx:xx:xx:xx:xx;IP:xxx.xxx.xxx.xxx";
 char g_RespString[30] = "XMOS S2E VER:;MAC:;IP:";
@@ -165,6 +169,7 @@ void chip_reset(void)
  *  \param unsigned int	telnet port number
  *  \return		1 		on success
  **/
+#pragma unsafe arrays
 static int valid_telnet_port(unsigned int port_num)
 {
     int i;
@@ -183,6 +188,7 @@ static int valid_telnet_port(unsigned int port_num)
  *  \param	int uart_id		UART Identifier
  *  \return	None
  **/
+#pragma unsafe arrays
 static int fetch_conn_id_for_uart_id(int uart_id)
 {
     int i = 0;
@@ -203,6 +209,7 @@ static int fetch_conn_id_for_uart_id(int uart_id)
  *  \param	int local_port		XTCP Port number
  *  \return	None
  **/
+#pragma unsafe arrays
 static int fetch_uart_id_for_port_id(int local_port)
 {
     int i;
@@ -224,6 +231,7 @@ static int fetch_uart_id_for_port_id(int local_port)
  *  \param xtcp_connection_t &conn
  *  \return			None
  **/
+#pragma unsafe arrays
 void update_user_conn_details(xtcp_connection_t &conn)
 {
     int i;
@@ -258,6 +266,7 @@ void update_user_conn_details(xtcp_connection_t &conn)
  *  \param xtcp_connection_t &conn
  *  \return			None
  **/
+#pragma unsafe arrays
 void free_user_conn_details(xtcp_connection_t &conn)
 {
     int i;
@@ -292,6 +301,7 @@ void free_user_conn_details(xtcp_connection_t &conn)
  *  \param char data
  *  \return			None
  **/
+#pragma unsafe arrays
 void fetch_user_data(xtcp_connection_t &conn, char data)
 {
     int write_index = 0;
@@ -317,6 +327,7 @@ void fetch_user_data(xtcp_connection_t &conn, char data)
  *  app_buffers_init
  *
  **/
+#pragma unsafe arrays
 static void app_buffers_init(void)
 {
     int i;
@@ -364,6 +375,7 @@ static void app_buffers_init(void)
  *  \param	chanend cWbSvr2AppMgr channel end sharing app manager thread
  *  \return			None
  **/
+#pragma unsafe arrays
 static void modify_telnet_port(chanend tcp_svr, streaming chanend cWbSvr2AppMgr)
 {
     int uart_id = 0;
@@ -397,12 +409,14 @@ static void modify_telnet_port(chanend tcp_svr, streaming chanend cWbSvr2AppMgr)
  *  \param	chanend tcp_svr		channel end sharing uip_server thread
  *  \return	None
  **/
+#pragma unsafe arrays
 static void fetch_uart_data_and_send_to_client(chanend tcp_svr,
                                                xtcp_connection_t &conn,
                                                chanend cAppMgr2WbSvr)
 {
     int i;
     int length_page;
+    unsigned buf_length;
 
     switch (conn.event)
     {
@@ -416,15 +430,15 @@ static void fetch_uart_data_and_send_to_client(chanend tcp_svr,
         {
             outct(cAppMgr2WbSvr, '2'); //PULL_UART_DATA_FROM_UART_TO_APP
             cAppMgr2WbSvr <: xtcp_send_data_buffer.uart_id;
-            cAppMgr2WbSvr :> xtcp_send_data_buffer.buf_length;
-
+            cAppMgr2WbSvr :> buf_length;
             /* Get UART data */
-            for (i=0; i<xtcp_send_data_buffer.buf_length; i++)
+            for (i = 0; i < buf_length; i++)
             {
                 /* Store Uart X data from channel */
                 cAppMgr2WbSvr :> xtcp_send_data_buffer.uart_rx_buffer_to_send[i];
             }
-            xtcp_send(tcp_svr, xtcp_send_data_buffer.uart_rx_buffer_to_send, xtcp_send_data_buffer.buf_length);
+            xtcp_send_data_buffer.buf_length = buf_length;
+            xtcp_send(tcp_svr, xtcp_send_data_buffer.uart_rx_buffer_to_send, buf_length);
             break;
         }
 
@@ -521,15 +535,15 @@ static void process_user_data(streaming chanend cWbSvr2AppMgr,
                 /* Parse commands and send to UART Manager via cWbSvr2AppMgr */
 #ifndef FLASH_THREAD
                 parse_client_request(cWbSvr2AppMgr,
-                                data,
-                                response,
-                                cmd_data_idx);
-#else //FLASH_THREAD
-                parse_client_request(cWbSvr2AppMgr,
-                                     cPersData,
                                      data,
                                      response,
                                      cmd_data_idx);
+#else //FLASH_THREAD
+                parse_client_request(cWbSvr2AppMgr,
+                                cPersData,
+                                data,
+                                response,
+                                cmd_data_idx);
 #endif //FLASH_THREAD
                 /* Send response back to telnet client */
                 connection_state_index = fetch_connection_state_index(user_client_data_buffer.conn_id);
@@ -545,6 +559,7 @@ static void process_user_data(streaming chanend cWbSvr2AppMgr,
  *  \param  chanend tcp_svr
  *  \return         None
  **/
+#pragma unsafe arrays
 static void form_and_send_udp_response(chanend tcp_svr)
 {
     int i = 0;
@@ -709,9 +724,15 @@ static void form_and_send_udp_response(chanend tcp_svr)
  *  \param  unsigned flash_address
  *  \return None
  **/
+#pragma unsafe arrays
+#ifndef FLASH_THREAD
+static void process_udp_query(chanend tcp_svr,
+                              unsigned flash_address)
+#else
 static void process_udp_query(chanend tcp_svr,
                               chanend cPersData,
                               unsigned flash_address)
+#endif
 {
     int i = 0;
     int j = 0;
@@ -799,8 +820,7 @@ static void process_udp_query(chanend tcp_svr,
 
             if (2 == DecisionVar)
             {
-                ipconfig_to_flash.ipaddr[k]
-                                = (unsigned char) atoi(ip_cfg_char_recd);
+                ipconfig_to_flash.ipaddr[k] = (unsigned char) atoi(ip_cfg_char_recd);
                 k++;
                 DecisionVar = 1;
             }
@@ -816,47 +836,41 @@ static void process_udp_query(chanend tcp_svr,
             ipconfig_to_flash.netmask[k] = g_ipconfig.netmask[k];
 
         }
-#if 0
-        g_ProcessBroadcastData = 1;
+#ifndef FLASH_THREAD
+        flash_write_ip_data(ipconfig_to_flash, flash_address);
 #else
         flash_write_ip_data(cPersData, ipconfig_to_flash, flash_address);
+#endif
         /* Soft reset the application */
         {
             chip_reset();
         }
-#endif
     }
-
 }
 
 /** =========================================================================
  *  web_server_handle_event
- *
  *  Uart manager event handler is a state machine to handle valid XTCP events,
  *  specific for HTTP and telnet clients
  *
  *  \param	chanend tcp_svr		channel end sharing uip_server thread
- *
  *  \param	xtcp_connection_t conn	reference to TCP client conn state mgt
  *  									structure
- *
  *  \param	chanend cWbSvr2AppMgr channel end sharing app manager thread
- *
  *  \return	None
- *
  **/
 #pragma unsafe arrays
 #ifndef FLASH_THREAD
 void web_server_handle_event(chanend tcp_svr,
-                xtcp_connection_t &conn,
+                             xtcp_connection_t &conn,
                              streaming chanend cWbSvr2AppMgr,
                              chanend cAppMgr2WbSvr,
                              unsigned flash_address)
 #else //FLASH_THREAD
 void web_server_handle_event(chanend tcp_svr,
-                             xtcp_connection_t &conn,
-                             streaming chanend cWbSvr2AppMgr,
-                             chanend cAppMgr2WbSvr,
+                xtcp_connection_t &conn,
+                streaming chanend cWbSvr2AppMgr,
+                chanend cAppMgr2WbSvr,
                 chanend cPersData,
                 unsigned flash_address)
 #endif //FLASH_THREAD
@@ -907,17 +921,19 @@ void web_server_handle_event(chanend tcp_svr,
         {
             case XTCP_NEW_CONNECTION:
             {
-            if (app_port_type==TYPE_HTTP_PORT)
-            {
-                httpd_init_state(tcp_svr, conn);
-            }
-            else if (app_port_type==TYPE_TELNET_PORT)
-            {
-                /* Initialize and manage telnet connection state and set tx buffers */
-                telnetd_init_state(tcp_svr, conn);
-                /* Note connection details so that data is manageable at server level */
-                update_user_conn_details(conn);
-            }
+                if (app_port_type==TYPE_HTTP_PORT)
+                {
+                    httpd_init_state(tcp_svr, conn);
+                }
+                else if (app_port_type==TYPE_TELNET_PORT)
+                {
+                    /* Initialize and manage telnet connection state and set tx buffers */
+                    telnetd_init_state(tcp_svr, conn);
+                    xtcp_ack_recv_mode(tcp_svr, conn);
+
+                    /* Note connection details so that data is manageable at server level */
+                    update_user_conn_details(conn);
+                }
                 else if (app_port_type==TYPE_UDP_PORT)
                 {
                     if((INCOMING_UDP_PORT == conn.local_port) && (g_BroadcastServerConn.id < 1))//Init conn)
@@ -934,73 +950,48 @@ void web_server_handle_event(chanend tcp_svr,
                         g_BroadcastResponseConn = conn;
                     }
                 }
-            break;
-            }
+                break;
+            } // case XTCP_NEW_CONNECTION:
             case XTCP_RECV_DATA:
             {
-            if (app_port_type==TYPE_HTTP_PORT)
-            {
-#ifndef FLASH_THREAD
-                httpd_recv(tcp_svr, conn, cWbSvr2AppMgr);
-#else //FLASH_THREAD
-                httpd_recv(tcp_svr, conn, cPersData, cWbSvr2AppMgr);
-#endif //FLASH_THREAD
-            }
-            else if (TELNET_PORT_USER_CMDS == conn.local_port)
-            {
-                telnetd_recv(tcp_svr, conn);
-            }
-            else if (app_port_type==TYPE_TELNET_PORT)
-            {
-                /* Identify UART X associated with this connection */
-                uart_id = fetch_uart_id_for_port_id(conn.local_port);
-                if (-1 != uart_id)
+                if (app_port_type==TYPE_HTTP_PORT)
                 {
-                    int TempLen = 0;
-                    int i = 0;
-
-                    TempLen = telnetd_recv_data(tcp_svr, conn, g_telnet_recd_data_buffer[0], g_telnet_actual_data_buffer[0]);
-
-                    /*
-                     * We receive the TCP data regardless of it being 'paused'.
-                     * Ideally, the TCP should have stopped receiving data on a
-                     * pause request. However, if a TCP packet comes in before
-                     * a pause issue; this will be lost if we do not consume it.
-                     *
-                     * This is the reason why 'xtcp_recd_data_buffer[]' is of
-                     * size (XTCP_CLIENT_BUF_SIZE * 2). So that, we can
-                     * accommodate an extra (worst case) packet from TCP after
-                     * the pause request.
-                     *
-                     * The reason why we place the below 'pause' threshold as
-                     * (XTCP_CLIENT_BUF_SIZE/2) is not confidently known. We
-                     * tried placing this threshold as XTCP_CLIENT_BUF_SIZE but
-                     * that did not work (data loss). So, we assumed that there
-                     * might be two packets arriving from the TCP after pause.
-                     * So, we get the first packet and store it in our x2 buffer
-                     * and by the time we get the second packet, we hope that
-                     * the write / read pointers are beyond what will be
-                     * over-written in the buffer. */
-
-                    if (xtcp_recd_data_buffer[uart_id].buf_depth + TempLen >= XTCP_CLIENT_BUF_SIZE/2)
+#ifndef FLASH_THREAD
+                    httpd_recv(tcp_svr, conn, cWbSvr2AppMgr);
+#else //FLASH_THREAD
+                    httpd_recv(tcp_svr, conn, cPersData, cWbSvr2AppMgr);
+#endif //FLASH_THREAD
+                }
+                else if (TELNET_PORT_USER_CMDS == conn.local_port)
+                {
+                    //telnetd_recv(tcp_svr, conn);
+                    telnetd_recv_data(tcp_svr, conn, g_telnet_recd_data_buffer[0], g_telnet_actual_data_buffer[0]);
+                }
+                else if (app_port_type==TYPE_TELNET_PORT)
+                {
+                    /* Identify UART X associated with this connection */
+                    uart_id = fetch_uart_id_for_port_id(conn.local_port);
+                    if (-1 != uart_id)
                     {
-                        /* Pause the connection till buffer is consumed */
-                        xtcp_pause(tcp_svr, conn);
-                        /* Upon data consumption, unpause connection */
-                    }
+                        int TempLen = 0;
+                        int i = 0;
+                        int write_index = 0;
 
-                    for (i=0; i<TempLen; i++)
-                    {
-                        xtcp_recd_data_buffer[uart_id].telnet_recd_data[xtcp_recd_data_buffer[uart_id].write_index] = g_telnet_actual_data_buffer[i];
-                        xtcp_recd_data_buffer[uart_id].write_index++;
-                        if (xtcp_recd_data_buffer[uart_id].write_index >= (XTCP_CLIENT_BUF_SIZE * 2))
+                        TempLen = telnetd_recv_data(tcp_svr, conn, g_telnet_recd_data_buffer[0], g_telnet_actual_data_buffer[0]);
+
+                        write_index = xtcp_recd_data_buffer[uart_id].write_index;
+
+                        for (i=0; i<TempLen; i++)
                         {
-                            xtcp_recd_data_buffer[uart_id].write_index = 0;
+                            xtcp_recd_data_buffer[uart_id].telnet_recd_data[write_index] = g_telnet_actual_data_buffer[i];
+                            write_index++;
+                            if(write_index >= (XTCP_RECD_BUF_SIZE)) {   write_index = 0;}
                         }
-                        xtcp_recd_data_buffer[uart_id].buf_depth++;
+
+                    xtcp_recd_data_buffer[uart_id].write_index = write_index;
+                    xtcp_recd_data_buffer[uart_id].buf_depth += TempLen;
                     }
                 }
-            }
                 else if (app_port_type==TYPE_UDP_PORT)
                 {
 #ifndef FLASH_THREAD
@@ -1009,71 +1000,79 @@ void web_server_handle_event(chanend tcp_svr,
                     process_udp_query(tcp_svr, cPersData, flash_address);
 #endif
                 }
-            break;
-            }
+                break;
+            } // case XTCP_RECV_DATA:
             case XTCP_SENT_DATA:
             case XTCP_REQUEST_DATA:
             case XTCP_RESEND_DATA:
-            if (app_port_type==TYPE_HTTP_PORT)
-#ifndef FLASH_THREAD
-            httpd_send(tcp_svr, conn);
-#else //FLASH_THREAD
-            httpd_send(tcp_svr, conn, cPersData);
-#endif //FLASH_THREAD
-            else if (TELNET_PORT_USER_CMDS == conn.local_port)
             {
-                /* Telnet User Commands */
-                telnet_buffered_send_handler(tcp_svr, conn);
-            }
-            else if (app_port_type==TYPE_TELNET_PORT)
-            {
-                if (conn.id == xtcp_send_data_buffer.conn_id)
+                if (app_port_type==TYPE_HTTP_PORT)
                 {
-                    /* There is xtcp bandwidth to accept data */
-                    fetch_uart_data_and_send_to_client(tcp_svr, conn, cAppMgr2WbSvr);
+#ifndef FLASH_THREAD
+                    httpd_send(tcp_svr, conn);
+#else //FLASH_THREAD
+                    httpd_send(tcp_svr, conn, cPersData);
+#endif //FLASH_THREAD
                 }
-                else
-                telnet_buffered_send_handler(tcp_svr, conn);
-            }
-            else if ((XTCP_SENT_DATA == conn.event) &&
-                     (app_port_type==TYPE_UDP_PORT) &&
-                     (conn.id == g_BroadcastResponseConn.id))
-            {
-                xtcp_complete_send(tcp_svr);
-                xtcp_close(tcp_svr, conn);
-            }
-            else if ((app_port_type==TYPE_UDP_PORT) &&
-                     (conn.id == g_BroadcastResponseConn.id))
-            {
-                form_and_send_udp_response(tcp_svr);
-            }
-            break;
+                else if (TELNET_PORT_USER_CMDS == conn.local_port)
+                {
+                    /* Telnet User Commands */
+                    telnet_buffered_send_handler(tcp_svr, conn);
+                }
+                else if (app_port_type==TYPE_TELNET_PORT)
+                {
+                    if (conn.id == xtcp_send_data_buffer.conn_id)
+                    {
+                        /* There is xtcp bandwidth to accept data */
+                        fetch_uart_data_and_send_to_client(tcp_svr, conn, cAppMgr2WbSvr);
+                    }
+                    else
+                    {
+                        telnet_buffered_send_handler(tcp_svr, conn);
+                    }
+                }
+                else if ((XTCP_SENT_DATA == conn.event) &&
+                                (app_port_type==TYPE_UDP_PORT) &&
+                                (conn.id == g_BroadcastResponseConn.id))
+                {
+                    xtcp_complete_send(tcp_svr);
+                    xtcp_close(tcp_svr, conn);
+                }
+                else if ((app_port_type==TYPE_UDP_PORT) &&
+                                (conn.id == g_BroadcastResponseConn.id))
+                {
+                    form_and_send_udp_response(tcp_svr);
+                }
+                break;
+            } // case XTCP_RESEND_DATA:
             case XTCP_TIMED_OUT:
             case XTCP_ABORTED:
             case XTCP_CLOSED:
-            if (app_port_type==TYPE_HTTP_PORT)
             {
-            httpd_free_state(conn);
-            }
-            else if (app_port_type==TYPE_TELNET_PORT)
-            {
-            telnetd_free_state(conn);
-            free_user_conn_details(conn);
-            }
+                if (app_port_type==TYPE_HTTP_PORT)
+                {
+                    httpd_free_state(conn);
+                }
+                else if (app_port_type==TYPE_TELNET_PORT)
+                {
+                    telnetd_free_state(conn);
+                    free_user_conn_details(conn);
+                }
 
-            if (app_port_type==TYPE_UDP_PORT)
-            {
-                if (conn.id == g_BroadcastResponseConn.id)
+                if (app_port_type==TYPE_UDP_PORT)
                 {
-                    g_BroadcastResponseConn.id = -1;
-                    g_BroadcastServerConn.id = -1; //TBC
+                    if (conn.id == g_BroadcastResponseConn.id)
+                    {
+                        g_BroadcastResponseConn.id = -1;
+                        g_BroadcastServerConn.id = -1; //TBC
+                    }
+                    else if (conn.id == g_BroadcastServerConn.id)
+                    {
+                        g_BroadcastServerConn.id = -1;
+                    }
                 }
-                else if (conn.id == g_BroadcastServerConn.id)
-                {
-                    g_BroadcastServerConn.id = -1;
-                }
-            }
-            break;
+                break;
+            } // case XTCP_CLOSED:
             default: break;
         }
         conn.event = XTCP_ALREADY_HANDLED;
@@ -1088,12 +1087,14 @@ void web_server_handle_event(chanend tcp_svr,
  *  \param  chanend cAppMgr2WbSvr
  *  \return None
  **/
+#pragma unsafe arrays
 static void send_uart_tx_data(chanend tcp_svr, chanend cAppMgr2WbSvr)
 {
     int buf_depth_avialable = 0;
     int i;
     int uart_id = 0;
     int data_to_send = 0;
+    int read_index = 0;
 
     uart_id = g_UartTxNumToSend;
 
@@ -1104,24 +1105,26 @@ static void send_uart_tx_data(chanend tcp_svr, chanend cAppMgr2WbSvr)
 
     cAppMgr2WbSvr <: data_to_send; //Amount of bytes to send
 
+    read_index = xtcp_recd_data_buffer[g_UartTxNumToSend].read_index;
+
     /* Get UART data */
     for (i=0; i<data_to_send; i++)
     {
         /* Send Uart X data to MUART TX */
-        cAppMgr2WbSvr <: xtcp_recd_data_buffer[g_UartTxNumToSend].telnet_recd_data[xtcp_recd_data_buffer[g_UartTxNumToSend].read_index];
-        xtcp_recd_data_buffer[g_UartTxNumToSend].read_index++;
-        if (xtcp_recd_data_buffer[g_UartTxNumToSend].read_index >= XTCP_CLIENT_BUF_SIZE * 2)
-        {
-            xtcp_recd_data_buffer[g_UartTxNumToSend].read_index = 0;
-        }
-        xtcp_recd_data_buffer[g_UartTxNumToSend].buf_depth--;
+        cAppMgr2WbSvr <: xtcp_recd_data_buffer[g_UartTxNumToSend].telnet_recd_data[read_index];
+        read_index++;
+        if (read_index >= XTCP_RECD_BUF_SIZE) { read_index = 0; }
     }
+
+    /* update buffer pointers */
+    xtcp_recd_data_buffer[g_UartTxNumToSend].read_index = read_index;
+    xtcp_recd_data_buffer[g_UartTxNumToSend].buf_depth -= data_to_send;
 
     if (xtcp_recd_data_buffer[g_UartTxNumToSend].buf_depth <= 0)
     {
         xtcp_connection_t conn;
         conn.id = fetch_conn_id_for_uart_id(uart_id);
-        xtcp_unpause(tcp_svr, conn);
+        xtcp_ack_recv(tcp_svr, conn);
     }
 
     gPollForUartDataToFetchFromUartRx = 1;
@@ -1234,11 +1237,11 @@ void web_server(chanend tcp_svr,
 
 #ifndef FLASH_THREAD
     address = get_flash_data_address(IPVER);
+    ipconfig = flash_read_ip_data(address);
 #else
     address = get_data_address(IPVER, cPersData);
-#endif
-
     ipconfig = flash_read_ip_data(cPersData, address);
+#endif
 
     for (i = 0; i < 4; i++)
     {
@@ -1267,24 +1270,30 @@ void web_server(chanend tcp_svr,
 
     processUserDataTimer :> processUserDataTS;
     processUserDataTS += PROCESS_USER_DATA_TMR_EVENT_INTRVL;
+
     // Get configuration from flash
     flash_data[0] = MARKER_START;
     flash_data[1] = CMD_CONFIG_RESTORE;
     flash_data[2] = MARKER_START;
     flash_data[3] = MARKER_END;
-    // Browser is requesting data
+
 #ifndef FLASH_THREAD
+
     parse_client_request(cWbSvr2AppMgr,
                     flash_data,
                     r_data,
                     FLASH_SIZE_PAGE);
+
 #else //FLASH_THREAD
+
     parse_client_request(cWbSvr2AppMgr,
                     cPersData,
                     flash_data,
                     r_data,
                     FLASH_SIZE_PAGE);
+
 #endif //FLASH_THREAD
+
     // Loop forever processing TCP events
     while(1)
     {
@@ -1304,69 +1313,81 @@ void web_server(chanend tcp_svr,
                         modify_telnet_port(tcp_svr, cWbSvr2AppMgr);
                     }
                 }
-            }
-            break;
+                break;
+            } // case cWbSvr2AppMgr :> WbSvr2AppMgr_uart_data :
+
             case inct_byref(cAppMgr2WbSvr, tok):
             {
                 if ('3' == tok) //UART_DATA_READY_UART_TO_APP
-
                 {
                     request_xtcp_init(tcp_svr, cAppMgr2WbSvr);
                 }
                 else if ('4' == tok) //NO_UART_DATA_READY
-
                 {
                     gPollForUartDataToFetchFromUartRx = 0;
                     gPollForSendingUartDataToUartTx = 0;
                     gPollForTelnetCommandData = 1;
                 }
-            }
-            break;
+                break;
+            } // case inct_byref(cAppMgr2WbSvr, tok):
+
 #ifndef FLASH_THREAD
+
             case xtcp_event(tcp_svr, conn):
-            web_server_handle_event(tcp_svr, conn, cWbSvr2AppMgr, cAppMgr2WbSvr, address);
-            break;
+            {
+                web_server_handle_event(tcp_svr, conn, cWbSvr2AppMgr, cAppMgr2WbSvr, address);
+                break;
+            } // case xtcp_event(tcp_svr, conn):
             case processUserDataTimer when timerafter (processUserDataTS) :> char _ :
-            //Send user data to Uart App
-            process_user_data(cWbSvr2AppMgr, tcp_svr);
-            processUserDataTS += PROCESS_USER_DATA_TMR_EVENT_INTRVL;
-            break;
+            {
+                //Send user data to Uart App
+                process_user_data(cWbSvr2AppMgr, tcp_svr);
+                processUserDataTS += PROCESS_USER_DATA_TMR_EVENT_INTRVL;
+                break;
+            } // case processUserDataTimer when timerafter (processUserDataTS) :> char _ :
+
 #else //FLASH_THREAD
+
             case xtcp_event(tcp_svr, conn):
-            web_server_handle_event(tcp_svr, conn, cWbSvr2AppMgr, cAppMgr2WbSvr, cPersData, address);
-            break;
+            {
+                web_server_handle_event(tcp_svr, conn, cWbSvr2AppMgr, cAppMgr2WbSvr, cPersData, address);
+                break;
+            } // case xtcp_event(tcp_svr, conn):
+
             case processUserDataTimer when timerafter (processUserDataTS) :> char _ :
-            if ((1 == g_ProcessBroadcastData) &&
-                            (g_BroadcastResponseConn.id > 0))
             {
-                xtcp_init_send(tcp_svr, g_BroadcastResponseConn);
-                g_ProcessBroadcastData = 0;
-            }
-            else if (gPollForUartDataToFetchFromUartRx)
-            {
-                /* Send CT */
-                outct(cAppMgr2WbSvr, '1');
-                gPollForUartDataToFetchFromUartRx = 0;
-            }
-            //TODO: More processing loop optim to be done for better xtcp recv rate
+                if ((1 == g_ProcessBroadcastData) && (g_BroadcastResponseConn.id > 0))
+                {
+                    xtcp_init_send(tcp_svr, g_BroadcastResponseConn);
+                    g_ProcessBroadcastData = 0;
+                }
+                else if (gPollForUartDataToFetchFromUartRx)
+                {
+                    /* Send CT */
+                    outct(cAppMgr2WbSvr, '1');
+                    gPollForUartDataToFetchFromUartRx = 0;
+                }
+                //TODO: More processing loop optim to be done for better xtcp recv rate
 
-            else if (gPollForSendingUartDataToUartTx)
-            {
-                /* Perform TX data transfer */
-                post_uart_tx_data(tcp_svr, cAppMgr2WbSvr);
-            }
-            else if (gPollForTelnetCommandData)
-            {
-                gPollForTelnetCommandData = 0;
-                process_user_data(cWbSvr2AppMgr, tcp_svr, cPersData);
-                gPollForUartDataToFetchFromUartRx = 0;
-                gPollForSendingUartDataToUartTx = 1;
-            }
-            processUserDataTS += PROCESS_USER_DATA_TMR_EVENT_INTRVL;
-            break;
+                else if (gPollForSendingUartDataToUartTx)
+                {
+                    /* Perform TX data transfer */
+                    post_uart_tx_data(tcp_svr, cAppMgr2WbSvr);
+                }
+                else if (gPollForTelnetCommandData)
+                {
+                    gPollForTelnetCommandData = 0;
+                    process_user_data(cWbSvr2AppMgr, tcp_svr, cPersData);
+                    gPollForUartDataToFetchFromUartRx = 0;
+                    gPollForSendingUartDataToUartTx = 1;
+                }
+                processUserDataTS += PROCESS_USER_DATA_TMR_EVENT_INTRVL;
+                break;
+            } // case processUserDataTimer when timerafter (processUserDataTS) :> char _ :
+
 #endif //FLASH_THREAD
-            default: break;
-        }
-    }
-}
 
+            default: break;
+        } // select
+    } // while(1)
+}

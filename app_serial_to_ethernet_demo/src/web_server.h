@@ -3,51 +3,53 @@
 // University of Illinois/NCSA Open Source License posted in
 // LICENSE.txt and at <http://github.xcore.com/>
 /*===========================================================================
-Filename: web_server.h
-Project : app_serial_to_ethernet_demo
-Author  : XMOS Ltd
-Version : 1v0
-Purpose : This file declares interfaces web server functions
------------------------------------------------------------------------------
+ Filename: web_server.h
+ Project : app_serial_to_ethernet_demo
+ Author  : XMOS Ltd
+ Version : 1v0
+ Purpose : This file declares interfaces web server functions
+ -----------------------------------------------------------------------------
 
-===========================================================================*/
-
-/*---------------------------------------------------------------------------
-include files
----------------------------------------------------------------------------*/
+ ===========================================================================*/
 #ifndef _web_server_h_
 #define _web_server_h_
 
 /*---------------------------------------------------------------------------
-constants
----------------------------------------------------------------------------*/
+ include files
+ ---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------
-extern variables
----------------------------------------------------------------------------*/
+ constants
+ ---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------
-typedefs
----------------------------------------------------------------------------*/
+ extern variables
+ ---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------
-global variables
----------------------------------------------------------------------------*/
+ typedefs
+ ---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------
-prototypes
----------------------------------------------------------------------------*/
+ global variables
+ ---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ prototypes
+ ---------------------------------------------------------------------------*/
 #ifndef FLASH_THREAD
-void web_server(
-		chanend tcp_svr,
-		streaming chanend cWbSvr2AppMgr,
-		chanend cAppMgr2WbSvr);
+
+void web_server(chanend tcp_svr,
+                streaming chanend cWbSvr2AppMgr,
+                chanend cAppMgr2WbSvr);
+
 #else //FLASH_THREAD
-void web_server(
-		chanend tcp_svr,
-		streaming chanend cWbSvr2AppMgr,
-		chanend cAppMgr2WbSvr,
-		chanend pers_data);
+
+void web_server(chanend tcp_svr,
+                streaming chanend cWbSvr2AppMgr,
+                chanend cAppMgr2WbSvr,
+                chanend pers_data);
+
 #endif //FLASH_THREAD
 
 #endif // _web_server_h_
