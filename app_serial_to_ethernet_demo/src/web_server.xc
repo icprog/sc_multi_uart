@@ -927,7 +927,11 @@ void web_server_handle_event(chanend tcp_svr,
                 {
                     /* Initialize and manage telnet connection state and set tx buffers */
                     telnetd_init_state(tcp_svr, conn);
-                    xtcp_ack_recv_mode(tcp_svr, conn);
+                    
+                    if(TELNET_PORT_USER_CMDS != conn.local_port)
+                    {                    
+                        xtcp_ack_recv_mode(tcp_svr, conn);
+                    }
 
                     /* Note connection details so that data is manageable at server level */
                     update_user_conn_details(conn);
