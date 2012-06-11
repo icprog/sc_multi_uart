@@ -8,7 +8,7 @@
  Filename: main.xc
  Project : app_serial_to_ethernet_demo
  Author  : XMOS Ltd
- Version : 1v1v2
+ Version : 1v0
  Purpose : This file defines resources (ports, clocks, threads and interfaces)
  required to implement serial to ethernet bridge application demostration
  -----------------------------------------------------------------------------
@@ -33,35 +33,27 @@
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
-//#define	DHCP_CONFIG	1	/* Set this to use DHCP */
-#define		TWO_THREAD_ETH		1 /* Enable this to use 2 thread ethernet component */
-#define 	XSCOPE_EN 0     /* set this to 1 for xscope printing */
-#define 	MUART_CORE_NUM		1 /* Core to place MUART comp and APP Manager Thread */
-
-#if XSCOPE_EN == 1
-#include <xscope.h>
-#endif
+#define	DHCP_CONFIG	1	/* Set this to use DHCP */
+#define		TWO_THREAD_ETH		1 //Enable this to use 2 thread ethernet component
 
 /*---------------------------------------------------------------------------
  ports and clocks
  ---------------------------------------------------------------------------*/
 /* MUART TX port configuration */
-#define PORT_TX on stdcore[MUART_CORE_NUM]: XS1_PORT_8B
-#define PORT_RX on stdcore[MUART_CORE_NUM]: XS1_PORT_8A
+#define PORT_TX on stdcore[1]: XS1_PORT_8B
+#define PORT_RX on stdcore[1]: XS1_PORT_8A
 
 on stdcore[0] : fl_SPIPorts flash_ports =
 { PORT_SPI_MISO,
   PORT_SPI_SS,
   PORT_SPI_CLK,
   PORT_SPI_MOSI,
-  XS1_CLKBLK_5 //XS1_CLKBLK_3
+  XS1_CLKBLK_3
 };
 
-on stdcore[MUART_CORE_NUM]: clock uart_clock_tx = XS1_CLKBLK_4;
-/* Define 1 bit external clock */
-on stdcore[MUART_CORE_NUM]: in port uart_ref_ext_clk = XS1_PORT_1F;
-
-on stdcore[MUART_CORE_NUM]: clock uart_clock_rx = XS1_CLKBLK_3;
+on stdcore[1]: clock uart_clock_tx = XS1_CLKBLK_1;
+on stdcore[1]: in port uart_ref_ext_clk = XS1_PORT_1F; /* Define 1 bit external clock */
+on stdcore[1]: clock uart_clock_rx = XS1_CLKBLK_2;
 
 #ifndef TWO_THREAD_ETH
 
@@ -93,11 +85,7 @@ on stdcore[0]: mii_interface_t mii =
     on stdcore[0]: smi_interface_t smi = {PORT_ETH_MDIO, PORT_ETH_MDC, 0};
 #endif
 #else //TWO_THREAD_ETH
-#if MUART_CORE_NUM == 1
 #define PORT_ETH_FAKE on stdcore[0]: XS1_PORT_8A
-#else  //#if MUART_CORE_NUM == 1
-#define PORT_ETH_FAKE    on stdcore[0]: XS1_PORT_8C
-#endif //#if MUART_CORE_NUM == 1
 
 on stdcore[0]: struct otp_ports otp_ports =
 {
@@ -120,8 +108,8 @@ on stdcore[0]: mii_interface_t mii =
  PORT_ETH_FAKE,
 };
 
-//on stdcore[0]: out port p_reset = XS1_PORT_8D;
-//on stdcore[0]: clock clk_smi = XS1_CLKBLK_5;
+on stdcore[0]: out port p_reset = XS1_PORT_8D;
+on stdcore[0]: clock clk_smi = XS1_CLKBLK_5;
 on stdcore[0]: smi_interface_t smi =
 {
   0,
@@ -144,7 +132,18 @@ s_multi_uart_rx_ports uart_rx_ports = {	PORT_RX };
 /* IP Config - change this to suit your network.
  * Leave with all 0 values to use DHCP
  */
-xtcp_ipconfig_t ipconfig;
+xtcp_ipconfig_t ipconfig =
+{
+#ifndef DHCP_CONFIG
+       { 169, 254, 196, 178 }, // ip address (eg 192,168,0,2)
+       { 255, 255, 0, 0 },     // netmask (eg 255,255,255,0)
+       { 0, 0, 0, 0 }          // gateway (eg 192,168,0,1)
+#else
+       { 0, 0, 0, 0 }, // ip address (eg 192,168,0,2)
+       { 0, 0, 0, 0 }, // netmask (eg 255,255,255,0)
+       { 0, 0, 0, 0 }  // gateway (eg 192,168,0,1)
+#endif
+};
 
 /*---------------------------------------------------------------------------
  static variables
@@ -254,29 +253,12 @@ int main(void)
 #else //TWO_THREAD_ETH
         on stdcore[0]:
         {
-            char mac_address[6],i;
-
+            char mac_address[6];
             ethernet_getmac_otp(otp_ports, mac_address);
-
-            for(i = 0;i<4; i++)
-            {
-            	xtcp[0] :> ipconfig.ipaddr[i];
-            	xtcp[0] :> ipconfig.netmask[i];
-            	xtcp[0] :> ipconfig.gateway[i];
-            }
             // Start server
-            //uipSingleServer(clk_smi, null, smi, mii, xtcp, 1, ipconfig, mac_address);
-            uipSingleServer(null, null, smi, mii, xtcp, 1, ipconfig, mac_address);
+            uipSingleServer(clk_smi, null, smi, mii, xtcp, 1, ipconfig, mac_address);
         }
 #endif //TWO_THREAD_ETH
-
-#if XSCOPE_EN == 1
-	            on stdcore[0]: {
-	                xscope_register (0 , 0 , " " , 0, " " );
-	                xscope_config_io ( XSCOPE_IO_BASIC );
-	                dummy();
-	            }
-#endif
 
 #ifdef FLASH_THREAD
 	            on stdcore[0]: flash_data_access(cPersData);
@@ -290,10 +272,9 @@ int main(void)
 #endif //FLASH_THREAD
 
 	            /* The multi-uart application manager thread to handle uart data communication to web server clients */
-	            on stdcore[0]: app_manager_handle_uart_data(cWbSvr2AppMgr, cAppMgr2WbSvr, cTxUART, cRxUART);
-
+	            on stdcore[1]: app_manager_handle_uart_data(cWbSvr2AppMgr, cAppMgr2WbSvr, cTxUART, cRxUART);
 	            /* run the multi-uart RX & TX with a common external clock - (2 threads) */
-	            on stdcore[MUART_CORE_NUM]: run_multi_uart_rxtx( cTxUART,  uart_tx_ports, cRxUART, uart_rx_ports, uart_clock_rx, uart_ref_ext_clk, uart_clock_tx);
+	            on stdcore[1]: run_multi_uart_rxtx( cTxUART,  uart_tx_ports, cRxUART, uart_rx_ports, uart_clock_rx, uart_ref_ext_clk, uart_clock_tx);
 	 } // par
 	return 0;
 }

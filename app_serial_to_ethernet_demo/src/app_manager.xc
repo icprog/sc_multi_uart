@@ -67,6 +67,9 @@ s_uart_channel_config uart_channel_config[UART_TX_CHAN_COUNT];
 s_uart_tx_channel_fifo uart_tx_channel_state[UART_TX_CHAN_COUNT];
 s_uart_rx_channel_fifo uart_rx_channel_state[UART_RX_CHAN_COUNT];
 s_pending_cmd_to_send pending_cmd_to_send;
+#if ENABLE_XSCOPE == 1
+int gCount[UART_RX_CHAN_COUNT];
+#endif //ENABLE_XSCOPE == 1
 
 /*---------------------------------------------------------------------------
  static variables
@@ -137,7 +140,6 @@ static void uart_channel_init(void)
  *  \return			None
  *
  **/
-#pragma unsafe arrays
 static void init_uart_channel_state(void)
 {
     int i;
@@ -177,7 +179,6 @@ static void init_uart_channel_state(void)
     } //for (i=0;i<UART_TX_CHAN_COUNT;i++)
 }
 
-#pragma unsafe arrays
 static void send_string_over_channel(char response[], int length, streaming chanend cWbSvr2AppMgr)
 {
     int i;
@@ -195,7 +196,6 @@ static void send_string_over_channel(char response[], int length, streaming chan
  *
  **/
 //static int validate_uart_params(int ui_command[], char ui_cmd_response[])
-#pragma unsafe arrays
 static int validate_uart_params(int ui_command[], streaming chanend cWbSvr2AppMgr)
 {
     int retVal = 1; //Default Success
@@ -302,7 +302,6 @@ static int validate_uart_params(int ui_command[], streaming chanend cWbSvr2AppMg
  *  \return		0 		on success
  *
  **/
-#pragma unsafe arrays
 static int configure_uart_channel(unsigned int channel_id)
 {
     int chnl_config_status = ERR_CHANNEL_CONFIG;
@@ -334,7 +333,6 @@ static int configure_uart_channel(unsigned int channel_id)
  *  \return			None
  *
  **/
-#pragma unsafe arrays
 static void apply_default_uart_cfg_and_wait_for_muart_tx_rx_threads(streaming chanend cTxUART,
                                                                     streaming chanend cRxUART)
 {
@@ -380,7 +378,6 @@ static void apply_default_uart_cfg_and_wait_for_muart_tx_rx_threads(streaming ch
  *  \return			None
  *
  **/
-#pragma unsafe arrays
 void uart_rx_receive_uart_channel_data( streaming chanend cUART, unsigned channel_id, timer tmr)
 {
     unsigned uart_char, temp;
@@ -408,8 +405,22 @@ void uart_rx_receive_uart_channel_data( streaming chanend cUART, unsigned channe
 #if ENABLE_XSCOPE == 1
         else
         {
-            printstr("App uart RX buffer full. Missed char for chnl id: ");
-            printintln(channel_id);
+            for(int i=0; i<UART_RX_CHAN_COUNT; i++)
+            {
+            	if (i == channel_id)
+            	{
+            		gCount[channel_id]++;
+            		break;
+            	}
+            }
+
+            if (500 == gCount[channel_id])
+        	{
+        		gCount[channel_id] = 0;
+            	printintln(channel_id);
+        	}
+            //printstr("App uart RX buffer full. Missed char for chnl id: ");
+            //printintln(channel_id);
         }
 #endif	//DEBUG_LEVEL_2
     } // if(uart_rx_validate_char(channel_id, uart_char) == 0)
@@ -435,10 +446,11 @@ void uart_rx_receive_uart_channel_data( streaming chanend cUART, unsigned channe
  *  					0	otherwise
  *
  **/
-#pragma unsafe arrays
 static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr)
 {
     int channel_id = 0;
+    int temp_channel_id = 0;
+    int channel_iter = 0;
     int now;
     int min_buf_level;
     for(channel_id = 0; channel_id < UART_RX_CHAN_COUNT; channel_id++)
@@ -473,14 +485,53 @@ static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr
         min_buf_level = RX_CHANNEL_MIN_PACKET_LEN;
     }
 
-    //printint(buf_depth); TODO: Bug: Data for chnl 7 is always present
     if ((uart_rx_channel_state[channel_id].buf_depth > min_buf_level) && (uart_rx_channel_state[channel_id].buf_depth <= RX_CHANNEL_FIFO_LEN))
     {
         /* Send Uart Id and buffer depth */
         outct(cAppMgr2WbSvr, '3'); //UART_DATA_READY_UART_TO_APP
         cAppMgr2WbSvr <: channel_id;
+        return;
     }
     else
+    {
+    	temp_channel_id = channel_id;
+    	/* Loop for all other channels to check if there is any data available on any other channel */
+    	for(channel_iter = 0; channel_iter < UART_RX_CHAN_COUNT; channel_iter++)
+    	{
+    		temp_channel_id++;
+
+    	    if(temp_channel_id >= UART_RX_CHAN_COUNT)
+    	    {
+    	    	temp_channel_id = 0;
+    	    }
+
+    	    if (temp_channel_id != channel_id)
+    	    {
+    	        tmr :> now;
+    	        if timeafter(now, uart_rx_channel_state[temp_channel_id].last_added_timestamp + RX_CHANNEL_FLUSH_TIMEOUT)
+    	        {
+    	            min_buf_level = 0;
+    }
+    else
+    	        {
+    	            min_buf_level = RX_CHANNEL_MIN_PACKET_LEN;
+    	        }
+
+    	        if ((uart_rx_channel_state[temp_channel_id].buf_depth > min_buf_level) && (uart_rx_channel_state[temp_channel_id].buf_depth <= RX_CHANNEL_FIFO_LEN))
+    	        {
+    	            /* Send Uart Id and buffer depth */
+    	            outct(cAppMgr2WbSvr, '3'); //UART_DATA_READY_UART_TO_APP
+    	            cAppMgr2WbSvr <: temp_channel_id;
+
+    	            uart_rx_channel_state[channel_id].is_currently_serviced = FALSE;
+    	            uart_rx_channel_state[temp_channel_id].is_currently_serviced = TRUE;
+    	            return;
+    	        }
+    	    }
+    	}
+    }
+
+    /* This will be called when there is no UART data in any of the UART Channels */
     outct(cAppMgr2WbSvr, '4'); //NO_UART_DATA_READY
 }
 
@@ -494,7 +545,6 @@ static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr
  *  \return			None
  *
  **/
-#pragma unsafe arrays
 static void collect_uart_tx_data(chanend cAppMgr2WbSvr)
 {
     int buf_depth_available = -1;
@@ -537,7 +587,6 @@ static void collect_uart_tx_data(chanend cAppMgr2WbSvr)
  *  					0	otherwise
  *
  **/
-#pragma unsafe arrays
 static void uart_rx_send_uart_channel_data(chanend cAppMgr2WbSvr)
 {
     int i = 0;
@@ -584,7 +633,6 @@ static void uart_rx_send_uart_channel_data(chanend cAppMgr2WbSvr)
  *  \return			None
  *
  **/
-#pragma unsafe arrays
 void uart_tx_fill_uart_channel_data_from_queue()
 {
     int channel_id;
@@ -669,26 +717,30 @@ static int re_apply_uart_channel_config(int channel_id,
  *  \return			None
  *
  **/
-#pragma unsafe arrays
 static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
                                    streaming chanend cTxUART,
                                    streaming chanend cRxUART)
 {
     char ui_cmd_unparsed[UI_COMMAND_LENGTH];
+    char ui_cmd_response[UI_COMMAND_LENGTH]; //TODO; Chk if this can be optimized
     int ui_command[NUM_UI_PARAMS];
     int cmd_length = 0;
     char cmd_type;
-	int i = 0, j =0;
+
+    int i, j;
     int iTemp = 0;
+    char dv[20]; //
     int index_start = 0;
     int index_end = 0;
     int index_cfg = -1;
     int index_uart = 0;
     char ui_param[20];
-    int done = 0;
 
     /* Get UART command data */
     {
+        int done = 0;
+        int i = 0;
+
         do
         {
             cWbSvr2AppMgr :> ui_cmd_unparsed[i];
@@ -700,8 +752,7 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
             {
                 i++;
             }
-        } while((done == 0) && (i < UI_COMMAND_LENGTH));
-
+        } while(done == 0);
         cmd_length = i;
     }
 
@@ -723,15 +774,15 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
                 /* Clear the array */
                 for (iTemp = 0; iTemp < 20; iTemp++)
                 {
-                	ui_param[iTemp] = '\0';
+                    dv[iTemp] = '\0';
                 }
 
                 for (j = 0; j < (i - index_start); j++)
                 {
-                	ui_param[j] = ui_cmd_unparsed[j + index_start];
+                    dv[j] = ui_cmd_unparsed[j + index_start];
                 }
 
-                ui_command[index_cfg] = atoi(ui_param);
+                ui_command[index_cfg] = atoi(dv);
                 index_end = 0;
                 index_start = 0;
             } //else [if (index_end == 0)]
@@ -739,6 +790,7 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
     } //for (i = 0; i < cmd_length; i++)
 
     // Now process the Command request
+    //if (validate_uart_params(ui_command, ui_cmd_response) //TODO
     if (validate_uart_params(ui_command, cWbSvr2AppMgr))
     {
         cmd_type = ui_command[0] + 48; // +48 for char
@@ -778,15 +830,12 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
             cWbSvr2AppMgr <: MARKER_START;
             if (0 != ui_command[i])
             {
-            	/* Function similar to itoa */
                 while(0 != ui_command[i])
                 {
                     ui_param[j] = ui_command[i]%10;
                     ui_command[i] = ui_command[i]/10;
                     j++;
                 }
-
-                /* Need to send the data in MSB -> LSB order */
                 while(0 != j)
                 {
                     cWbSvr2AppMgr <: (char)(ui_param[j-1] + 48);
@@ -814,7 +863,6 @@ static int parse_uart_command_data( streaming chanend cWbSvr2AppMgr,
  *  \return	None
  *
  */
-#pragma unsafe arrays
 void app_manager_handle_uart_data( streaming chanend cWbSvr2AppMgr,
                                   chanend cAppMgr2WbSvr,
                                   streaming chanend cTxUART,

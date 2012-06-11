@@ -70,7 +70,6 @@ extern void fetch_user_data(
 *  \return	None
 *
 **/
-#pragma unsafe arrays
 void telnetd_recv_line(chanend tcp_svr,
                        int id,
                        //char line[],
@@ -96,9 +95,10 @@ void telnetd_recv_line(chanend tcp_svr,
 **/
 void telnetd_new_connection(chanend tcp_svr, int id)
 {
-  char welcome[50] = "Welcome to serial to ethernet telnet demo!";
-
-  telnetd_send_line(tcp_svr, id, (char *)welcome);
+  char welcome[][50] = {"Welcome to serial to ethernet telnet server demo!",
+                        "(This server config acts as echo server...)"};
+  for (int i=0;i<2;i++)
+    telnetd_send_line(tcp_svr, id, welcome[i]);
 
   active_conn = id;
 }
@@ -116,7 +116,6 @@ void telnetd_new_connection(chanend tcp_svr, int id)
 *  \return	None
 *
 **/
-#pragma unsafe arrays
 void telnetd_set_new_session(chanend tcp_svr, int telnet_port)
 {
   // Listen on the telnet port

@@ -18,11 +18,7 @@ include files
 #ifndef _debug_h_
 #define _debug_h_
 
-/* Enable this macro for tracing high level code flow */
-//#define DEBUG_LEVEL_1	1
-#ifdef DEBUG_LEVEL_1
 #include <print.h>
-#endif //DEBUG_LEVEL_1
 
 /*---------------------------------------------------------------------------
 constants
@@ -34,6 +30,8 @@ constants
 /* Enable this macro to set variable baud rates at init time */
 //#define SET_VARIABLE_BAUD_RATE	(1)
 
+/* Enable this macro for tracing high level code flow */
+//#define DEBUG_LEVEL_1	1
 /* Enable this macro for function level debugging,
  * overflow/underflow scenarios */
 //#define DEBUG_LEVEL_2	1

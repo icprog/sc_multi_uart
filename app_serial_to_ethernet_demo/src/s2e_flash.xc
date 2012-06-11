@@ -4,7 +4,7 @@
 // LICENSE.txt and at <http://github.xcore.com/>
 
 /*===========================================================================
- Filename: s2e_flash.xc
+ Filename:
  Project :
  Author  :
  Version :
@@ -24,7 +24,7 @@
 //#include <print.h>
 #include "s2e_flash.h"
 #include "debug.h"
-#include "common.h"
+
 /*---------------------------------------------------------------------------
  constants
  ---------------------------------------------------------------------------*/
@@ -79,7 +79,6 @@ int get_flash_data_page_address(int data_page);
  *  \param char data     array where read data will be stored
  *  \return int          S2E_FLASH_OK / S2E_FLASH_ERROR
  **/
-#pragma unsafe arrays
 int read_from_flash(int address, char data[])
 {
     // connect to flash
@@ -100,9 +99,9 @@ int read_from_flash(int address, char data[])
  *  \return int          S2E_FLASH_OK / S2E_FLASH_ERROR
  *
  **/
-#pragma unsafe arrays
 int write_to_flash(int address, char data[])
 {
+    int address_copy = address;
     int ix_sector;
     int num_sectors;
     int sector;
@@ -143,7 +142,6 @@ int write_to_flash(int address, char data[])
  *
  *  \return int          S2E_FLASH_OK / S2E_FLASH_ERROR
  **/
-#pragma unsafe arrays
 int connect_flash()
 {
     // connect to flash
@@ -178,7 +176,6 @@ int connect_flash()
  *  \return int          S2E_FLASH_OK / S2E_FLASH_ERROR
  *
  **/
-#pragma unsafe arrays
 int get_flash_config_address(int last_rom_page, int last_rom_length)
 {
     int total_rom_bytes;
@@ -233,7 +230,6 @@ int get_flash_config_address(int last_rom_page, int last_rom_length)
  *  \return int          S2E_FLASH_OK / S2E_FLASH_ERROR
  *
  **/
-#pragma unsafe arrays
 int get_flash_data_page_address(int data_page)
 {
     int address, index_data_sector;
@@ -256,7 +252,6 @@ int get_flash_data_page_address(int data_page)
 *  \return int          S2E_FLASH_OK / S2E_FLASH_ERROR
 *
 **/
-#pragma unsafe arrays
 int flash_get_config_address(int last_rom_page, int last_rom_length)
 {
     int address;
@@ -319,7 +314,6 @@ int flash_read_config(int address, char data[])
  *                           (Flash port present in Core0)
  *
  **/
-#pragma unsafe arrays
 void flash_data_access(chanend cPersData)
 {
     char channel_data;
@@ -372,39 +366,6 @@ void flash_data_access(chanend cPersData)
                     address = get_flash_config_address(rom_page, rom_length);
                     cPersData <: address;
                 }
-                else if (FLASH_GET_NEXT_SECTOR_ADDRESS == channel_data)
-                {
-                	unsigned sectors, num_sectors, current_sector_address;
-                	cPersData :> address;
-                	num_sectors = fl_getNumSectors();
-                    for (i = 0; i < num_sectors; i++)
-                    {
-                        current_sector_address = fl_getSectorAddress(i);
-                        if (current_sector_address >= address)
-                        {
-                            cPersData <: current_sector_address;
-                            break;
-                        }
-                    }
-                }
-                else if(FLASH_IPVER_WRITE == channel_data)
-                {
-                    cPersData :> address;
-                    for(i = 0; i < 30; i++)
-                    {
-                        cPersData :> flash_page_data[i];
-                    }
-                    write_to_flash(address, flash_page_data);
-                }
-                else if(FLASH_IPVER_READ == channel_data)
-                {
-                    cPersData :> address;
-                    read_from_flash(address, flash_page_data);
-                    for(i = 0; i < 30; i++)
-                    {
-                        cPersData <: flash_page_data[i];
-                    }
-                }
                 break;
             } // case cPersData :> channel_data :
             default: break;
@@ -423,7 +384,6 @@ void flash_data_access(chanend cPersData)
 *  see: s2e_flash.xc: flash_data_access()
 *
 **/
-#pragma unsafe arrays
 int flash_access(char flash_operation, char data[], int address, chanend cPersData)
 {
     int i, rtnval;

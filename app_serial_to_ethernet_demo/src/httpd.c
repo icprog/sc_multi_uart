@@ -81,7 +81,6 @@ static void setup_error_webpage(httpd_state_t *hs);
  *  \return	None
  *
  **/
-#pragma unsafe arrays
 void httpd_init(chanend tcp_svr)
 {
     int i;
@@ -149,7 +148,7 @@ void parse_http_request(httpd_state_t *hs,
 {
     int channel_id = 0;
     int request_type;
-    char temp_file_name[WPAGE_FILE_NAME_LEN];
+    char temp_file_name[32];
     int i, j;
 
     // Return if we have data already
@@ -170,6 +169,10 @@ void parse_http_request(httpd_state_t *hs,
                                  &hs->wpage_data[0],
                                  len);
 #else //FLASH_THREAD
+            /* Make a call to exchange UART command data */
+        	/* Send CT */
+           // outct(cAppMgr2WbSvr, 'a'); //UART_CONTROL_TOKEN_CMD_EXCHG
+
             parse_client_request(cWbSvr2AppMgr,
                                  cPersData,
                                  &data[0],
@@ -418,7 +421,6 @@ void httpd_send(chanend tcp_svr, xtcp_connection_t *conn, chanend cPersData)
  *  \return	None
  *
  **/
-#pragma unsafe arrays
 void httpd_init_state(chanend tcp_svr, xtcp_connection_t *conn)
 {
     int i;
@@ -461,7 +463,6 @@ void httpd_init_state(chanend tcp_svr, xtcp_connection_t *conn)
  *  \return	None
  *
  **/
-#pragma unsafe arrays
 void httpd_free_state(xtcp_connection_t *conn)
 {
     int i;
@@ -485,7 +486,6 @@ void httpd_free_state(xtcp_connection_t *conn)
  *
  *
  **/
-#pragma unsafe arrays
 static void setup_error_webpage(httpd_state_t *hs)
 {
     memset(&(hs->wpage_data[0]), NULL, sizeof(hs->wpage_data));
