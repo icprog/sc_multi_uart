@@ -31,6 +31,7 @@ constants
 #define TX_CHANNEL_FIFO_LEN			128 //This is a common length between app server and data manager
 #define RX_CHANNEL_FIFO_LEN			256
 #define RX_CHANNEL_MIN_PACKET_LEN                40
+#define RX_CHANNEL_MIN_PACKET_LEN_DEFAULT        12
 #define RX_CHANNEL_FLUSH_TIMEOUT           10000000
 #ifndef NUM_HTTPD_CONNECTIONS
 /* Maximum number of concurrent connections */

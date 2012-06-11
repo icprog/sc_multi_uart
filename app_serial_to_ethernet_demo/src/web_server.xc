@@ -446,7 +446,7 @@ static void fetch_uart_data_and_send_to_client(chanend tcp_svr,
         	txTimeStamp_2 = 0;
             txProfiler :> txTimeStamp_2;
             //printint(xtcp_send_data_buffer.buf_length);
-            printchar(';');
+            //printchar(';');
             printintln(txTimeStamp_2 - txTimeStamp_1);
 #endif //if ENABLE_XSCOPE == 1
 

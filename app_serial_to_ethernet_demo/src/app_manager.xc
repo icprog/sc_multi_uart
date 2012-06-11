@@ -482,7 +482,10 @@ static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr
     }
     else
     {
-        min_buf_level = RX_CHANNEL_MIN_PACKET_LEN;
+    	if (uart_channel_config[channel_id].baud > 57600)
+    		min_buf_level = RX_CHANNEL_MIN_PACKET_LEN;
+    	else
+    		min_buf_level = RX_CHANNEL_MIN_PACKET_LEN_DEFAULT;
     }
 
     if ((uart_rx_channel_state[channel_id].buf_depth > min_buf_level) && (uart_rx_channel_state[channel_id].buf_depth <= RX_CHANNEL_FIFO_LEN))
@@ -514,7 +517,10 @@ static void poll_uart_rx_data_to_send_to_client(chanend cAppMgr2WbSvr, timer tmr
     }
     else
     	        {
-    	            min_buf_level = RX_CHANNEL_MIN_PACKET_LEN;
+    	        	if (uart_channel_config[temp_channel_id].baud > 57600)
+    	        		min_buf_level = RX_CHANNEL_MIN_PACKET_LEN;
+    	        	else
+    	        		min_buf_level = RX_CHANNEL_MIN_PACKET_LEN_DEFAULT;
     	        }
 
     	        if ((uart_rx_channel_state[temp_channel_id].buf_depth > min_buf_level) && (uart_rx_channel_state[temp_channel_id].buf_depth <= RX_CHANNEL_FIFO_LEN))
