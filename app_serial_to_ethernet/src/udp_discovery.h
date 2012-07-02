@@ -8,12 +8,8 @@
 #define UDP_RECV_BUF_SIZE		    80 //UIP_CONF_RECEIVE_WINDOW
 #endif
 
-#ifndef INCOMING_UDP_PORT
-#define INCOMING_UDP_PORT			15534
-#endif
-
-#ifndef OUTGOING_UDP_PORT
-#define OUTGOING_UDP_PORT 			15533
+#ifndef UDP_DISCOVERY_PORT
+#define UDP_DISCOVERY_PORT 			15534
 #endif
 
 #ifndef S2E_FIRMWARE_VER

@@ -298,14 +298,17 @@ void s2e_flash(chanend c_flash, chanend c_flash_data, fl_SPIPorts &flash_ports)
                             flash_data[1] = ipconf.ipaddr[0];
                             flash_data[2] = ipconf.ipaddr[1];
                             flash_data[3] = ipconf.ipaddr[2];
+                            flash_data[4] = ipconf.ipaddr[3];
 
-                            flash_data[4] = ipconf.netmask[0];
-                            flash_data[5] = ipconf.netmask[1];
-                            flash_data[6] = ipconf.netmask[2];
+                            flash_data[5] = ipconf.netmask[0];
+                            flash_data[6] = ipconf.netmask[1];
+                            flash_data[7] = ipconf.netmask[2];
+                            flash_data[8] = ipconf.netmask[3];
 
-                            flash_data[7] = ipconf.gateway[0];
-                            flash_data[8] = ipconf.gateway[1];
-                            flash_data[9] = ipconf.gateway[2];
+                            flash_data[9] = ipconf.gateway[0];
+                            flash_data[10] = ipconf.gateway[1];
+                            flash_data[11] = ipconf.gateway[2];
+                            flash_data[12] = ipconf.gateway[3];
 
                         } // else if(data_type == IPVER)
 
@@ -366,14 +369,17 @@ void s2e_flash(chanend c_flash, chanend c_flash_data, fl_SPIPorts &flash_ports)
                                 ipconf.ipaddr[0] = flash_data[1];
                                 ipconf.ipaddr[1] = flash_data[2];
                                 ipconf.ipaddr[2] = flash_data[3];
+                                ipconf.ipaddr[3] = flash_data[4];
 
-                                ipconf.netmask[0] = flash_data[4];
-                                ipconf.netmask[1] = flash_data[5];
-                                ipconf.netmask[2] = flash_data[6];
+                                ipconf.netmask[0] = flash_data[5];
+                                ipconf.netmask[1] = flash_data[6];
+                                ipconf.netmask[2] = flash_data[7];
+                                ipconf.netmask[3] = flash_data[8];
 
-                                ipconf.gateway[0] = flash_data[7];
-                                ipconf.gateway[1] = flash_data[8];
-                                ipconf.gateway[2] = flash_data[9];
+                                ipconf.gateway[0] = flash_data[9];
+                                ipconf.gateway[1] = flash_data[10];
+                                ipconf.gateway[2] = flash_data[11];
+                                ipconf.gateway[3] = flash_data[12];
 
                                 c_flash_data <: ipconf;
 
