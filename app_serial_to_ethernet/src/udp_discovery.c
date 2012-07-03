@@ -167,7 +167,7 @@ void udp_discovery_event_handler(chanend c_xtcp,
 	    	xtcp_get_ipconfig(c_xtcp, &g_ipconfig);
 	    	memcpy(&ipconfig, &g_ipconfig, sizeof(g_ipconfig));
 	    	xtcp_get_mac_address(c_xtcp, g_mac_addr);
-	        xtcp_connect(c_xtcp, UDP_DISCOVERY_PORT, broadcast_addr, XTCP_PROTOCOL_UDP);
+	        xtcp_connect(c_xtcp, OUTGOING_UDP_PORT, broadcast_addr, XTCP_PROTOCOL_UDP);
 	    case XTCP_IFDOWN:
 	    case XTCP_ALREADY_HANDLED:
 	      return;
@@ -175,15 +175,15 @@ void udp_discovery_event_handler(chanend c_xtcp,
 	      break;
 	    }
 
-	  if ((UDP_DISCOVERY_PORT == conn->remote_port) && (XTCP_NEW_CONNECTION == conn->event) ){
+	  if ((OUTGOING_UDP_PORT == conn->remote_port) && (XTCP_NEW_CONNECTION == conn->event) ){
 		if (XTCP_IPADDR_CMP(conn->remote_addr, broadcast_addr)) {
   	      udp_disc_state.conn_id = conn->id;
   	      udp_disc_state.active = 1;
-  	      xtcp_bind_local(c_xtcp, conn, UDP_DISCOVERY_PORT);
+  	      xtcp_bind_local(c_xtcp, conn, INCOMING_UDP_PORT);
 		}
 	  }
 
-	  if (UDP_DISCOVERY_PORT == conn->local_port) {
+	  if (INCOMING_UDP_PORT == conn->local_port) {
 		  switch (conn->event)
 	      {
 	      case XTCP_RECV_DATA:
