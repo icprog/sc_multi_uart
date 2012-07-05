@@ -2,7 +2,7 @@ import socket
 import time
 
 #Ports for sendig and Listening
-send_port = 15534 
+send_port = 15534
 recv_port = 15533
 
 ip = socket.gethostbyname(socket.gethostname())
@@ -19,133 +19,95 @@ if( option == 'n'):
 	Host_IP = raw_input('Enter Your IP Address : ') # IP from where python scripts are running
 	Host_IP=str(Host_IP)
 
+#print '\n' + 'Using Default Send Port : ' + str(send_port)
+#print 'Using Default Receive Port : ' + str(recv_port)
 
-print '\n' + 'Using Default Send Port : ' + str(send_port)
-print 'Using Default Receive Port : ' + str(recv_port)
+print '\n\tEnter 1 for Sending S2E Broadcast Command \n'
+print '\tEnter 2 for Modifying IP of S2E  \n'
+print '\tPress any other key for exit \n'
 
-s = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket for sending data
-s1 = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket for Listening Data
+action=raw_input()
+action=str(action)
+Dest_IP=0
+while  ((action == '1') or ((action == '2'))) :
 
-sock = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket fro Broadcasting Hello Message
-sock.bind( ( '', 0 ) )
-sock.setsockopt( socket.SOL_SOCKET, socket.SO_BROADCAST, 1 )
-sock.sendto( 'XMOS S2E REPLY', ( '<broadcast>',  send_port ) )
+    if (action == '1') :
+        s = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket for sending data
+        s1 = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket for Listening Data
 
-print 'Brodcasted command: XMOS S2E REPLY '
-    
-try:   
-    s1.bind( ( Host_IP, recv_port ) )
-    msg_ack = s1.recv( 150 )
-    
-    print '\n' + 'Received Acknowledgement : ' + msg_ack  + '\n'
+        sock = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket fro Broadcasting Hello Message
+        sock.bind( ( '', 0 ) )
+        sock.setsockopt( socket.SOL_SOCKET, socket.SO_BROADCAST, 1 )
+        sock.sendto( 'XMOS S2E REPLY', ( '<broadcast>',  send_port ) )
 
-    i = 0
-    version	= '- '
-    mac_addr	= '- '
-    ip_addr	= '- '
-    while(msg_ack[i]!= 'V'):
-    	i+=1;
-    
-    while msg_ack[ i ] != ';' :
-        version = version + msg_ack[ i ]
-        i+=1
-    i=i+1
-    while msg_ack[ i ] != ';' :
-        mac_addr = mac_addr + msg_ack[ i ]
-        i+=1
-    i=i+1
-    while  (i) != len(msg_ack) :
-        ip_addr = ip_addr + msg_ack[ i ]
-        i+=1
-    k=0
-    Dest_IP=ip_addr[5:len(ip_addr)]
-  
-except Exception, msg:
-    print msg
-    s1.close()
-    s.close()
-    exit( 1 )
+        print 'Brodcasted command: XMOS S2E REPLY '
+        try:
+            s1.bind( ( Host_IP, recv_port ) )
+            msg_ack = s1.recv( 150 )
 
-print '--------------S2E DETAILS----------------'
-print version
-print mac_addr
-print ip_addr    
-print '------------------------------------------'
+            print '\n' + 'Received Acknowledgement : ' + msg_ack  + '\n'
 
-try:
-    inp=raw_input( 'Do u want to send IP change request (y/n) : ' ) # Sending IP Change Request
-    if inp == 'y' :
-    	ipaddress = raw_input('Input new IP adress : ' )
-        s.sendto( "XMOS S2E IPCHANGE " + str( ipaddress ), ( Dest_IP, send_port ) )
-	print ipaddress
-      
-    else:
+            i = 0
+            version	= '- '
+            mac_addr	= '- '
+            ip_addr	= '- '
+
+            while(msg_ack[i]!= 'V'):
+                i+=1;
+                
+            while msg_ack[ i ] != ';' :
+                version = version + msg_ack[ i ]
+                i+=1
+            i=i+1
+
+            while msg_ack[ i ] != ';' :
+                mac_addr = mac_addr + msg_ack[ i ]
+                i+=1
+            i=i+1
+
+            while  (i) != len(msg_ack) :
+                ip_addr = ip_addr + msg_ack[ i ]
+                i+=1
+            k=0
+            Dest_IP=ip_addr[2:len(ip_addr)]
+
+            print '--------------S2E DETAILS----------------'
+            print version
+            print mac_addr
+            print ip_addr
+            print '------------------------------------------'
+
+        except Exception, msg:
+            print msg
+            s1.close()
+            s.close()
+            exit( 1 )
+
         s1.close()
         s.close()
-        exit( 1 )
-    
-except Exception, msg:
-    print msg
-    s1.close()
-    s.close()
 
-    exit( 1 )
+    elif ((action == '2') and (Dest_IP == 0)):
+        print '\nEnter Destination IP. Choose option 1, instead\n'
+        
+    elif (action == '2'):
+        s = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket for sending data
+        s1 = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket for Listening Data
 
-try:
-    s1.close()
-    s.close()
-    sec=raw_input('Enter time (sec) to wait for sending Broadcast Message : ')
-    sec=int(sec)
-    time.sleep(sec)
-   
-    s = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket for sending data
-    s1 = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket for Listening Data
+        sock = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket fro Broadcasting Hello Message
+        sock.bind( ( '', 0 ) )
+        sock.setsockopt( socket.SOL_SOCKET, socket.SO_BROADCAST, 1 )
 
-    sock = socket.socket( socket.AF_INET, socket.SOCK_DGRAM ) # Socket fro Broadcasting Hello Message
-    sock.bind( ( '', 0 ) )
-    sock.setsockopt( socket.SOL_SOCKET, socket.SO_BROADCAST, 1 )
-    sock.sendto( 'XMOS S2E REPLY', ( '<broadcast>',  send_port ) )
+        ipaddress = raw_input('Input new IP adress : ' )
+        s.sendto( "XMOS S2E IPCHANGE " + str( ipaddress ), ( Dest_IP, send_port ) )
+        print ipaddress
+        time.sleep(5)
 
-    print 'Brodcasted command: XMOS S2E REPLY '
+        s1.close()
+        s.close()
 
-    s1.bind( ( Host_IP, recv_port ) )
-    msg_ack = s1.recv( 150 )
-    
-    print '\n' + 'Received Acknowledgement : ' + msg_ack  + '\n'
+    print '\n\n\n\tEnter 1 for Sending S2E Broadcast Command \n'
+    print '\tEnter 2 for Modifying IP of S2E  \n'
+    print '\tPress any other key for exit \n'
 
-    i = 0
-    version	= '- '
-    mac_addr	= '- '
-    ip_addr	= '- '
-    while(msg_ack[i]!= 'V'):
-    	i+=1;
-    
-    while msg_ack[ i ] != ';' :
-        version = version + msg_ack[ i ]
-        i+=1
-    i=i+1
-    while msg_ack[ i ] != ';' :
-        mac_addr = mac_addr + msg_ack[ i ]
-        i+=1
-    i=i+1
-    while  (i) != len(msg_ack) :
-        ip_addr = ip_addr + msg_ack[ i ]
-        i+=1
-    k=0
-    Dest_IP=ip_addr[5:len(ip_addr)]
-  	
-     
-    print '--------------S2E DETAILS----------------'
-    print version
-    print mac_addr
-    print ip_addr
-    print '------------------------------------------'+'\n'+'\n'
-    
-except Exception,msg:
-    print msg
-    s1.close()
-    s.close()
-    exit( 1 )
-inp=raw_input(' -- @@ -- PRESS ANY KEY TO EXIT -- @@ -- ')
-s1.close()
-s.close()
+    action=raw_input()
+    action=str(action)
