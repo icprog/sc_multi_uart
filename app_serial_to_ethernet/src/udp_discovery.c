@@ -8,13 +8,15 @@
 #include "util.h"
 
 typedef struct connection_state_t {
-  int conn_id;
+  xtcp_connection_t udp_disc_bdcast_conn;
+  //int conn_id;
   int active;
   int send_resp;
   char *err;
 } connection_state_t;
 
 static connection_state_t udp_disc_state;
+xtcp_connection_t udp_disc_incoming_conn;
 static char buf[UDP_RECV_BUF_SIZE];
 //UDP Response Format :: "XMOS S2E VER:a.b.c;MAC:xx:xx:xx:xx:xx:xx;IP:xxx.xxx.xxx.xxx";
 static char *g_FirmwareVer = S2E_FIRMWARE_VER;
@@ -29,12 +31,12 @@ xtcp_ipconfig_t g_ipconfig;
 unsigned char g_mac_addr[6];
 
 
-#define USE_STATIC_IP   0
+#define USE_STATIC_IP   1
 
 xtcp_ipconfig_t ipconfig =
 {
 #if USE_STATIC_IP
-   {  169, 254, 196, 178},
+   {  172, 17, 0, 11},
    {  255, 255, 0, 0},
    {  0, 0, 0, 0}
 #else
@@ -143,11 +145,17 @@ void udp_discovery_init(chanend c_xtcp, chanend c_flash_data, xtcp_ipconfig_t *p
     int flash_result;
 
 	udp_disc_state.active = 0;
-	udp_disc_state.conn_id = -1;
+	//udp_disc_state.conn_id = -1;
+	udp_disc_state.udp_disc_bdcast_conn.id = -1;
+	udp_disc_incoming_conn.id = -1;
+
+	/*send_cmd_to_flash_thread(c_flash_data, IPVER, FLASH_CMD_SAVE);
+	send_ipconfig_to_flash_thread(c_flash_data, &ipconfig);
+	flash_result = get_flash_access_result(c_flash_data);*/
 
 	send_cmd_to_flash_thread(c_flash_data, IPVER, FLASH_CMD_RESTORE);
 	flash_result = get_flash_access_result(c_flash_data);
-	if(flash_result == S2E_FLASH_OK)
+	if (flash_result == S2E_FLASH_OK)
 	{
 	    get_ipconfig_from_flash_thread(c_flash_data, p_ipconfig);
 	}
@@ -168,6 +176,7 @@ void udp_discovery_event_handler(chanend c_xtcp,
 	    	memcpy(&ipconfig, &g_ipconfig, sizeof(g_ipconfig));
 	    	xtcp_get_mac_address(c_xtcp, g_mac_addr);
 	        xtcp_connect(c_xtcp, OUTGOING_UDP_PORT, broadcast_addr, XTCP_PROTOCOL_UDP);
+	        xtcp_listen(c_xtcp, INCOMING_UDP_PORT, XTCP_PROTOCOL_UDP);
 	    case XTCP_IFDOWN:
 	    case XTCP_ALREADY_HANDLED:
 	      return;
@@ -175,17 +184,20 @@ void udp_discovery_event_handler(chanend c_xtcp,
 	      break;
 	    }
 
-	  if ((OUTGOING_UDP_PORT == conn->remote_port) && (XTCP_NEW_CONNECTION == conn->event) ){
-		if (XTCP_IPADDR_CMP(conn->remote_addr, broadcast_addr)) {
-  	      udp_disc_state.conn_id = conn->id;
-  	      udp_disc_state.active = 1;
-  	      xtcp_bind_local(c_xtcp, conn, INCOMING_UDP_PORT);
-		}
-	  }
-
-	  if (INCOMING_UDP_PORT == conn->local_port) {
+	  if ((INCOMING_UDP_PORT == conn->local_port) ||
+          (OUTGOING_UDP_PORT == conn->remote_port)) {
 		  switch (conn->event)
 	      {
+		  case XTCP_NEW_CONNECTION:
+			if (XTCP_IPADDR_CMP(conn->remote_addr, broadcast_addr)) {
+	  	        //udp_disc_state.conn_id = conn->id;
+	  	        udp_disc_state.udp_disc_bdcast_conn = *conn;
+	  	        udp_disc_state.active = 1;
+			}
+			else if (-1 == udp_disc_incoming_conn.id) {
+			  udp_disc_incoming_conn = *conn;
+			}
+	        break;
 	      case XTCP_RECV_DATA:
 	    	  //len = xtcp_recv(c_xtcp, buf);
 	    	  len = xtcp_recv_count(c_xtcp, buf, UDP_RECV_BUF_SIZE);
@@ -194,7 +206,7 @@ void udp_discovery_event_handler(chanend c_xtcp,
 	            break;
 
 	          parse_udp_buffer(c_xtcp, c_flash_data, conn, buf, len+1);
-	          xtcp_init_send(c_xtcp, conn);
+	          xtcp_init_send(c_xtcp, &udp_disc_state.udp_disc_bdcast_conn);
 
 	        break;
 	      case XTCP_REQUEST_DATA:
@@ -216,9 +228,13 @@ void udp_discovery_event_handler(chanend c_xtcp,
 	    	  break;
 	      case XTCP_SENT_DATA:
 	          xtcp_complete_send(c_xtcp);
-	          if (udp_disc_state.active) {
+	          if ((udp_disc_state.active) &&
+	        	  (udp_disc_state.udp_disc_bdcast_conn.id == conn->id)) {
 	        	udp_disc_state.send_resp = 0;
 	        	udp_disc_state.err = NULL;
+
+	        	xtcp_close(c_xtcp, &udp_disc_incoming_conn);
+	        	udp_disc_incoming_conn.id = -1;
 	          }
 	    	  break;
 	      case XTCP_CLOSED:
